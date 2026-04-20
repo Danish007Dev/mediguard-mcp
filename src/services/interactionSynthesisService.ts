@@ -1,9 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { GeminiClient } from "../clients/geminiClient";
 import type { GroqClient } from "../clients/groqClient";
 import type { Logger } from "../logging/logger";
 import type {
   InteractionFinding,
+  InteractionLlmTelemetry,
+  InteractionLlmTrace,
   InteractionPatientContext,
   LlmInteractionAnalysis,
   RiskLevel,
@@ -26,6 +28,22 @@ export interface InteractionSynthesisResult {
   provider: AnalysisProvider;
   overallRisk: "low" | "moderate" | "high";
   interactionAnalyses: LlmInteractionAnalysis[];
+  trace: InteractionLlmTrace;
+  telemetry: InteractionLlmTelemetry;
+}
+
+interface InteractionSynthesisCoreResult {
+  summary: string;
+  recommendations: string[];
+  provider: AnalysisProvider;
+  overallRisk: "low" | "moderate" | "high";
+  interactionAnalyses: LlmInteractionAnalysis[];
+}
+
+interface ProviderCallCounters {
+  groq: number;
+  gemini: number;
+  ruleBased: number;
 }
 
 interface PromptRawInteraction {
@@ -36,6 +54,12 @@ interface PromptRawInteraction {
 }
 
 const MAX_INTERACTIONS_FOR_PROMPT = 12;
+const APPROX_CHARS_PER_TOKEN = 4;
+
+const ESTIMATED_COST_PER_1K_TOKENS_USD = {
+  groq: 0.0012,
+  gemini: 0.001,
+} as const;
 
 const llmSeveritySchema = z.enum(["low", "moderate", "high"]);
 
@@ -201,7 +225,7 @@ function fallbackAlternativesForPair(drug1: string, drug2: string): string[] {
 
 function buildRuleBasedSummary(
   input: InteractionSynthesisInput,
-): InteractionSynthesisResult {
+): InteractionSynthesisCoreResult {
   const patientContextText = buildPatientContextSummary(input.patientContext);
 
   if (input.interactions.length === 0) {
@@ -319,7 +343,7 @@ function toCacheKey(input: InteractionSynthesisInput): string {
 function finalizeParsedResult(
   parsed: z.infer<typeof llmSynthesisSchema>,
   input: InteractionSynthesisInput,
-): InteractionSynthesisResult {
+): InteractionSynthesisCoreResult {
   const fallback = buildRuleBasedSummary(input);
   const parsedAnalyses = parsed.interactionAnalyses.slice(
     0,
@@ -348,13 +372,56 @@ function finalizeParsedResult(
   };
 }
 
+function estimateTokensFromText(value: string): number {
+  const length = value.trim().length;
+  if (length === 0) {
+    return 0;
+  }
+
+  return Math.ceil(length / APPROX_CHARS_PER_TOKEN);
+}
+
+function estimateTokensFromUnknown(value: unknown): number {
+  return estimateTokensFromText(JSON.stringify(value));
+}
+
+function buildPatientContextUsage(input: InteractionSynthesisInput): {
+  age: boolean;
+  conditions: boolean;
+  renalFunction: boolean;
+} {
+  return {
+    age: typeof input.patientContext?.age === "number",
+    conditions: (input.patientContext?.conditions.length ?? 0) > 0,
+    renalFunction: Boolean(input.patientContext?.renalFunction),
+  };
+}
+
+function round(value: number, precision = 6): number {
+  const multiplier = 10 ** precision;
+  return Math.round(value * multiplier) / multiplier;
+}
+
 /**
  * Provider-fallback synthesis service for interaction summaries and recommendations.
  */
 export class InteractionSynthesisService {
-  private readonly synthesisCache = new TtlCache<string, InteractionSynthesisResult>(
+  private readonly synthesisCache = new TtlCache<
+    string,
+    InteractionSynthesisCoreResult
+  >(
     10 * 60 * 1000,
   );
+  private totalRequests = 0;
+  private cacheHits = 0;
+  private readonly providerCalls: ProviderCallCounters = {
+    groq: 0,
+    gemini: 0,
+    ruleBased: 0,
+  };
+  private estimatedPromptTokens = 0;
+  private estimatedCompletionTokens = 0;
+  private estimatedSpendUsd = 0;
 
   public constructor(
     private readonly groqClient: GroqClient,
@@ -362,11 +429,111 @@ export class InteractionSynthesisService {
     private readonly logger: Logger,
   ) {}
 
+  private buildTelemetrySnapshot(): InteractionLlmTelemetry {
+    const estimatedTotalTokens =
+      this.estimatedPromptTokens + this.estimatedCompletionTokens;
+
+    return {
+      totalRequests: this.totalRequests,
+      cacheHits: this.cacheHits,
+      cacheHitRate:
+        this.totalRequests > 0
+          ? round(this.cacheHits / this.totalRequests, 4)
+          : 0,
+      providerCalls: {
+        groq: this.providerCalls.groq,
+        gemini: this.providerCalls.gemini,
+        ruleBased: this.providerCalls.ruleBased,
+      },
+      estimatedPromptTokens: this.estimatedPromptTokens,
+      estimatedCompletionTokens: this.estimatedCompletionTokens,
+      estimatedTotalTokens,
+      estimatedSpendUsd: round(this.estimatedSpendUsd, 6),
+    };
+  }
+
+  private buildTrace(
+    input: InteractionSynthesisInput,
+    traceId: string,
+    cacheHit: boolean,
+    attemptedProviders: Array<"groq" | "gemini" | "rule-based">,
+    selectedProvider: "groq" | "gemini" | "rule-based",
+    fallbackUsed: boolean,
+  ): InteractionLlmTrace {
+    return {
+      traceId,
+      cacheHit,
+      attemptedProviders,
+      selectedProvider,
+      fallbackUsed,
+      promptInteractionCount: input.interactions.length,
+      patientContextUsed: buildPatientContextUsage(input),
+    };
+  }
+
+  private withMetadata(
+    core: InteractionSynthesisCoreResult,
+    trace: InteractionLlmTrace,
+  ): InteractionSynthesisResult {
+    return {
+      ...core,
+      trace,
+      telemetry: this.buildTelemetrySnapshot(),
+    };
+  }
+
+  private logTrace(trace: InteractionLlmTrace, telemetry: InteractionLlmTelemetry): void {
+    this.logger.info("Interaction synthesis reasoning trace", {
+      traceId: trace.traceId,
+      cacheHit: trace.cacheHit,
+      attemptedProviders: trace.attemptedProviders,
+      selectedProvider: trace.selectedProvider,
+      fallbackUsed: trace.fallbackUsed,
+      promptInteractionCount: trace.promptInteractionCount,
+      patientContextUsed: trace.patientContextUsed,
+      cacheHitRate: telemetry.cacheHitRate,
+      providerCalls: telemetry.providerCalls,
+      estimatedTotalTokens: telemetry.estimatedTotalTokens,
+      estimatedSpendUsd: telemetry.estimatedSpendUsd,
+    });
+  }
+
+  private recordProviderTokenUsage(
+    provider: "groq" | "gemini",
+    prompt: { system: string; user: string },
+    payload: unknown,
+  ): void {
+    const promptTokens =
+      estimateTokensFromText(prompt.system) + estimateTokensFromText(prompt.user);
+    const completionTokens = estimateTokensFromUnknown(payload);
+    const totalTokens = promptTokens + completionTokens;
+
+    this.estimatedPromptTokens += promptTokens;
+    this.estimatedCompletionTokens += completionTokens;
+    this.estimatedSpendUsd +=
+      (totalTokens / 1000) * ESTIMATED_COST_PER_1K_TOKENS_USD[provider];
+  }
+
   public async synthesize(
     input: InteractionSynthesisInput,
   ): Promise<InteractionSynthesisResult> {
+    this.totalRequests += 1;
+    const traceId = randomUUID();
+
     if (input.interactions.length === 0) {
-      return buildRuleBasedSummary(input);
+      this.providerCalls.ruleBased += 1;
+      const core = buildRuleBasedSummary(input);
+      const trace = this.buildTrace(
+        input,
+        traceId,
+        false,
+        ["rule-based"],
+        "rule-based",
+        false,
+      );
+      const result = this.withMetadata(core, trace);
+      this.logTrace(result.trace, result.telemetry);
+      return result;
     }
 
     const trimmedInput: InteractionSynthesisInput = {
@@ -377,26 +544,51 @@ export class InteractionSynthesisService {
     const cacheKey = toCacheKey(trimmedInput);
     const cached = this.synthesisCache.get(cacheKey);
     if (cached) {
-      return cached;
+      this.cacheHits += 1;
+      const trace = this.buildTrace(
+        trimmedInput,
+        traceId,
+        true,
+        [cached.provider],
+        cached.provider,
+        cached.provider === "rule-based",
+      );
+      const result = this.withMetadata(cached, trace);
+      this.logTrace(result.trace, result.telemetry);
+      return result;
     }
 
     const prompt = buildPrompt(trimmedInput);
+    const attemptedProviders: Array<"groq" | "gemini" | "rule-based"> = [];
 
     if (this.groqClient.isConfigured()) {
+      attemptedProviders.push("groq");
+      this.providerCalls.groq += 1;
       try {
         const response = await this.groqClient.generateStructuredJson(
           prompt.system,
           prompt.user,
         );
+        this.recordProviderTokenUsage("groq", prompt, response);
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
           const finalized = finalizeParsedResult(parsed, trimmedInput);
-          const result = {
+          const core = {
             ...finalized,
             provider: "groq" as const,
           };
 
-          this.synthesisCache.set(cacheKey, result);
+          this.synthesisCache.set(cacheKey, core);
+          const trace = this.buildTrace(
+            trimmedInput,
+            traceId,
+            false,
+            attemptedProviders,
+            "groq",
+            false,
+          );
+          const result = this.withMetadata(core, trace);
+          this.logTrace(result.trace, result.telemetry);
           return result;
         }
 
@@ -411,20 +603,33 @@ export class InteractionSynthesisService {
     }
 
     if (this.geminiClient.isConfigured()) {
+      attemptedProviders.push("gemini");
+      this.providerCalls.gemini += 1;
       try {
         const response = await this.geminiClient.generateStructuredJson(
           prompt.system,
           prompt.user,
         );
+        this.recordProviderTokenUsage("gemini", prompt, response);
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
           const finalized = finalizeParsedResult(parsed, trimmedInput);
-          const result = {
+          const core = {
             ...finalized,
             provider: "gemini" as const,
           };
 
-          this.synthesisCache.set(cacheKey, result);
+          this.synthesisCache.set(cacheKey, core);
+          const trace = this.buildTrace(
+            trimmedInput,
+            traceId,
+            false,
+            attemptedProviders,
+            "gemini",
+            false,
+          );
+          const result = this.withMetadata(core, trace);
+          this.logTrace(result.trace, result.telemetry);
           return result;
         }
 
@@ -438,9 +643,21 @@ export class InteractionSynthesisService {
       }
     }
 
+    attemptedProviders.push("rule-based");
+    this.providerCalls.ruleBased += 1;
     const fallback = buildRuleBasedSummary(trimmedInput);
     this.synthesisCache.set(cacheKey, fallback);
-    return fallback;
+    const trace = this.buildTrace(
+      trimmedInput,
+      traceId,
+      false,
+      attemptedProviders,
+      "rule-based",
+      true,
+    );
+    const result = this.withMetadata(fallback, trace);
+    this.logTrace(result.trace, result.telemetry);
+    return result;
   }
 }
 
@@ -451,6 +668,33 @@ export class RuleOnlyInteractionSynthesisService {
   public async synthesize(
     input: InteractionSynthesisInput,
   ): Promise<InteractionSynthesisResult> {
-    return buildRuleBasedSummary(input);
+    const core = buildRuleBasedSummary(input);
+
+    return {
+      ...core,
+      trace: {
+        traceId: randomUUID(),
+        cacheHit: false,
+        attemptedProviders: ["rule-based"],
+        selectedProvider: "rule-based",
+        fallbackUsed: false,
+        promptInteractionCount: input.interactions.length,
+        patientContextUsed: buildPatientContextUsage(input),
+      },
+      telemetry: {
+        totalRequests: 1,
+        cacheHits: 0,
+        cacheHitRate: 0,
+        providerCalls: {
+          groq: 0,
+          gemini: 0,
+          ruleBased: 1,
+        },
+        estimatedPromptTokens: 0,
+        estimatedCompletionTokens: 0,
+        estimatedTotalTokens: 0,
+        estimatedSpendUsd: 0,
+      },
+    };
   }
 }

@@ -64,6 +64,10 @@ describe("InteractionSynthesisService", () => {
     expect(result.provider).toBe("groq");
     expect(result.overallRisk).toBe("high");
     expect(result.summary).toContain("Groq");
+    expect(result.trace.selectedProvider).toBe("groq");
+    expect(result.trace.cacheHit).toBe(false);
+    expect(result.telemetry.providerCalls.groq).toBe(1);
+    expect(result.telemetry.totalRequests).toBe(1);
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
 
@@ -106,6 +110,10 @@ describe("InteractionSynthesisService", () => {
     expect(result.provider).toBe("gemini");
     expect(result.overallRisk).toBe("high");
     expect(result.summary).toContain("Gemini");
+    expect(result.trace.attemptedProviders).toEqual(["groq", "gemini"]);
+    expect(result.trace.selectedProvider).toBe("gemini");
+    expect(result.telemetry.providerCalls.groq).toBe(1);
+    expect(result.telemetry.providerCalls.gemini).toBe(1);
   });
 
   it("falls back to rule-based output when providers are unavailable", async () => {
@@ -130,6 +138,8 @@ describe("InteractionSynthesisService", () => {
     expect(result.provider).toBe("rule-based");
     expect(result.recommendations.length).toBeGreaterThan(0);
     expect(result.interactionAnalyses.length).toBeGreaterThan(0);
+    expect(result.trace.selectedProvider).toBe("rule-based");
+    expect(result.trace.fallbackUsed).toBe(true);
   });
 
   it("falls back to rule-based when LLM output violates required schema", async () => {
@@ -168,6 +178,7 @@ describe("InteractionSynthesisService", () => {
 
     expect(result.provider).toBe("rule-based");
     expect(result.interactionAnalyses[0]?.saferAlternatives.length).toBeGreaterThan(0);
+    expect(result.trace.selectedProvider).toBe("rule-based");
   });
 
   it("falls back to rule-based output when both providers return invalid schemas", async () => {
@@ -191,6 +202,12 @@ describe("InteractionSynthesisService", () => {
 
     expect(result.provider).toBe("rule-based");
     expect(result.summary.toLowerCase()).toContain("detected");
+    expect(result.trace.selectedProvider).toBe("rule-based");
+    expect(result.trace.attemptedProviders).toEqual([
+      "groq",
+      "gemini",
+      "rule-based",
+    ]);
   });
 
   it("falls back to rule-based output when Gemini throws", async () => {
@@ -215,6 +232,7 @@ describe("InteractionSynthesisService", () => {
     const result = await service.synthesize(input);
 
     expect(result.provider).toBe("rule-based");
+    expect(result.trace.selectedProvider).toBe("rule-based");
   });
 
   it("returns cached synthesis for repeated identical inputs", async () => {
@@ -253,6 +271,9 @@ describe("InteractionSynthesisService", () => {
     const second = await service.synthesize(input);
 
     expect(first.summary).toBe(second.summary);
+    expect(second.trace.cacheHit).toBe(true);
+    expect(second.telemetry.cacheHits).toBeGreaterThan(0);
+    expect(second.telemetry.cacheHitRate).toBeGreaterThan(0);
     expect(groqClient.generateStructuredJson).toHaveBeenCalledTimes(1);
   });
 
@@ -270,5 +291,7 @@ describe("InteractionSynthesisService", () => {
     expect(result.provider).toBe("rule-based");
     expect(result.summary.toLowerCase()).toContain("no interaction evidence");
     expect(result.overallRisk).toBe("low");
+    expect(result.trace.selectedProvider).toBe("rule-based");
+    expect(result.telemetry.providerCalls.ruleBased).toBe(1);
   });
 });

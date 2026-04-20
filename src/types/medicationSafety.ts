@@ -31,10 +31,41 @@ export interface LlmInteractionAnalysis {
   saferAlternatives: string[];
 }
 
+export interface InteractionLlmTrace {
+  traceId: string;
+  cacheHit: boolean;
+  attemptedProviders: Array<"groq" | "gemini" | "rule-based">;
+  selectedProvider: "groq" | "gemini" | "rule-based";
+  fallbackUsed: boolean;
+  promptInteractionCount: number;
+  patientContextUsed: {
+    age: boolean;
+    conditions: boolean;
+    renalFunction: boolean;
+  };
+}
+
+export interface InteractionLlmTelemetry {
+  totalRequests: number;
+  cacheHits: number;
+  cacheHitRate: number;
+  providerCalls: {
+    groq: number;
+    gemini: number;
+    ruleBased: number;
+  };
+  estimatedPromptTokens: number;
+  estimatedCompletionTokens: number;
+  estimatedTotalTokens: number;
+  estimatedSpendUsd: number;
+}
+
 export interface InteractionLlmSynthesis {
   overallRisk: "low" | "moderate" | "high";
   contextualizedSummary: string;
   interactionAnalyses: LlmInteractionAnalysis[];
+  trace?: InteractionLlmTrace;
+  telemetry?: InteractionLlmTelemetry;
 }
 
 export interface NormalizedMedication {

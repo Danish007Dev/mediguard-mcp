@@ -367,6 +367,8 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
       overallRisk: synthesis.overallRisk,
       contextualizedSummary: synthesis.summary,
       interactionAnalyses: synthesis.interactionAnalyses,
+      trace: synthesis.trace,
+      telemetry: synthesis.telemetry,
     };
 
     return {

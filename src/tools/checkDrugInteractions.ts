@@ -100,6 +100,39 @@ export const checkDrugInteractionsOutputSchema = {
           saferAlternatives: z.array(z.string()),
         }),
       ),
+      trace: z
+        .object({
+          traceId: z.string().uuid(),
+          cacheHit: z.boolean(),
+          attemptedProviders: z.array(
+            z.enum(["groq", "gemini", "rule-based"]),
+          ),
+          selectedProvider: z.enum(["groq", "gemini", "rule-based"]),
+          fallbackUsed: z.boolean(),
+          promptInteractionCount: z.number().int().nonnegative(),
+          patientContextUsed: z.object({
+            age: z.boolean(),
+            conditions: z.boolean(),
+            renalFunction: z.boolean(),
+          }),
+        })
+        .optional(),
+      telemetry: z
+        .object({
+          totalRequests: z.number().int().positive(),
+          cacheHits: z.number().int().nonnegative(),
+          cacheHitRate: z.number().min(0).max(1),
+          providerCalls: z.object({
+            groq: z.number().int().nonnegative(),
+            gemini: z.number().int().nonnegative(),
+            ruleBased: z.number().int().nonnegative(),
+          }),
+          estimatedPromptTokens: z.number().int().nonnegative(),
+          estimatedCompletionTokens: z.number().int().nonnegative(),
+          estimatedTotalTokens: z.number().int().nonnegative(),
+          estimatedSpendUsd: z.number().nonnegative(),
+        })
+        .optional(),
     })
     .optional(),
   generatedAt: z.string(),

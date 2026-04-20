@@ -1,7 +1,7 @@
 ### Phase 5: LLM Integration & Reasoning (Days 17-20)
 **Goal**: Strengthen Groq/Gemini clinical synthesis with strict JSON contracts, patient-context adaptation, and resilient cost-safe fallbacks.
 
-## Current Implementation (Started)
+## Current Implementation
 
 Interaction synthesis now uses a structured prompt and validated response contract in `src/services/interactionSynthesisService.ts`, then merges LLM output into interaction findings in `src/services/rxNormOpenFdaDrugInteractionService.ts`.
 
@@ -56,8 +56,26 @@ Implemented controls:
 - Token bounds: interaction payload capped to top `MAX_INTERACTIONS_FOR_PROMPT` entries.
 - No-LLM fast path: if there are no interactions, deterministic synthesis is used immediately.
 
+### 5) Reasoning Trace and Telemetry
+
+Each synthesis result now carries machine-consumable trace and telemetry metadata:
+
+- `trace` includes:
+  - `traceId`
+  - provider attempt chain
+  - selected provider
+  - fallback flag
+  - cache-hit flag
+  - patient-context usage signals
+- `telemetry` includes cumulative counters:
+  - total requests
+  - cache hits and cache-hit rate
+  - provider call counts (Groq/Gemini/rule-based)
+  - estimated prompt/completion/total token usage
+  - estimated spend in USD
+
+Trace records are also written through logger metadata for operational debugging.
+
 ## Next Steps in Phase 5
 
-- Add explicit reasoning-trace metadata output (machine-consumable trace IDs/summary tags).
-- Add cost telemetry counters per provider (request count, cache hit rate).
 - Extend same strict JSON pattern across other synthesis services.
