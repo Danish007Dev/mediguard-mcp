@@ -10,6 +10,11 @@ describe("InteractionSynthesisService", () => {
   const input = {
     medications: ["warfarin", "ibuprofen"],
     riskLevel: "high" as const,
+    patientContext: {
+      age: 67,
+      conditions: ["AFib", "CKD3"],
+      renalFunction: "30-59 mL/min",
+    },
     interactions: [
       {
         drugs: ["warfarin", "ibuprofen"],
@@ -26,8 +31,20 @@ describe("InteractionSynthesisService", () => {
     const groqClient = {
       isConfigured: jest.fn().mockReturnValue(true),
       generateStructuredJson: jest.fn().mockResolvedValue({
-        summary: "Groq summary",
+        overallRisk: "high",
+        contextualizedSummary: "Groq summary",
         recommendations: ["Groq recommendation"],
+        interactionAnalyses: [
+          {
+            drug1: "warfarin",
+            drug2: "ibuprofen",
+            severity: "high",
+            reasoning: "High bleeding risk in anticoagulated patients.",
+            mechanism: "Additive anticoagulant and antiplatelet effects.",
+            monitoringRecommendations: ["Monitor INR twice weekly."],
+            saferAlternatives: ["Use acetaminophen if analgesia is required."],
+          },
+        ],
       }),
     };
 
@@ -45,6 +62,7 @@ describe("InteractionSynthesisService", () => {
     const result = await service.synthesize(input);
 
     expect(result.provider).toBe("groq");
+    expect(result.overallRisk).toBe("high");
     expect(result.summary).toContain("Groq");
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
@@ -60,8 +78,20 @@ describe("InteractionSynthesisService", () => {
     const geminiClient = {
       isConfigured: jest.fn().mockReturnValue(true),
       generateStructuredJson: jest.fn().mockResolvedValue({
-        summary: "Gemini summary",
+        overallRisk: "high",
+        contextualizedSummary: "Gemini summary",
         recommendations: ["Gemini recommendation"],
+        interactionAnalyses: [
+          {
+            drug1: "warfarin",
+            drug2: "ibuprofen",
+            severity: "high",
+            reasoning: "Risk remains high with this combination.",
+            mechanism: "Bleeding pathway overlap.",
+            monitoringRecommendations: ["Track bleeding symptoms."],
+            saferAlternatives: ["Switch NSAID to acetaminophen when feasible."],
+          },
+        ],
       }),
     };
 
@@ -74,6 +104,7 @@ describe("InteractionSynthesisService", () => {
     const result = await service.synthesize(input);
 
     expect(result.provider).toBe("gemini");
+    expect(result.overallRisk).toBe("high");
     expect(result.summary).toContain("Gemini");
   });
 
@@ -98,14 +129,27 @@ describe("InteractionSynthesisService", () => {
 
     expect(result.provider).toBe("rule-based");
     expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.interactionAnalyses.length).toBeGreaterThan(0);
   });
 
-  it("accepts non-array recommendations by coercing to an empty list", async () => {
+  it("falls back to rule-based when LLM output violates required schema", async () => {
     const groqClient = {
       isConfigured: jest.fn().mockReturnValue(true),
       generateStructuredJson: jest.fn().mockResolvedValue({
-        summary: "Groq summary",
-        recommendations: "not-an-array",
+        overallRisk: "high",
+        contextualizedSummary: "Invalid because safer alternatives are missing.",
+        recommendations: ["Monitor closely"],
+        interactionAnalyses: [
+          {
+            drug1: "warfarin",
+            drug2: "ibuprofen",
+            severity: "high",
+            reasoning: "High risk.",
+            mechanism: "Mechanism",
+            monitoringRecommendations: ["Monitor INR"],
+            saferAlternatives: [],
+          },
+        ],
       }),
     };
 
@@ -122,8 +166,8 @@ describe("InteractionSynthesisService", () => {
 
     const result = await service.synthesize(input);
 
-    expect(result.provider).toBe("groq");
-    expect(result.recommendations).toEqual([]);
+    expect(result.provider).toBe("rule-based");
+    expect(result.interactionAnalyses[0]?.saferAlternatives.length).toBeGreaterThan(0);
   });
 
   it("falls back to rule-based output when both providers return invalid schemas", async () => {
@@ -173,15 +217,58 @@ describe("InteractionSynthesisService", () => {
     expect(result.provider).toBe("rule-based");
   });
 
+  it("returns cached synthesis for repeated identical inputs", async () => {
+    const groqClient = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      generateStructuredJson: jest.fn().mockResolvedValue({
+        overallRisk: "high",
+        contextualizedSummary: "Cached summary",
+        recommendations: ["Cached recommendation"],
+        interactionAnalyses: [
+          {
+            drug1: "warfarin",
+            drug2: "ibuprofen",
+            severity: "high",
+            reasoning: "High bleeding risk.",
+            mechanism: "Additive effects.",
+            monitoringRecommendations: ["Monitor INR"],
+            saferAlternatives: ["Acetaminophen"],
+          },
+        ],
+      }),
+    };
+
+    const geminiClient = {
+      isConfigured: jest.fn().mockReturnValue(false),
+      generateStructuredJson: jest.fn(),
+    };
+
+    const service = new InteractionSynthesisService(
+      groqClient as never,
+      geminiClient as never,
+      logger,
+    );
+
+    const first = await service.synthesize(input);
+    const second = await service.synthesize(input);
+
+    expect(first.summary).toBe(second.summary);
+    expect(groqClient.generateStructuredJson).toHaveBeenCalledTimes(1);
+  });
+
   it("rule-only synthesis returns no-interaction summary when interaction list is empty", async () => {
     const service = new RuleOnlyInteractionSynthesisService();
     const result = await service.synthesize({
       medications: ["metformin"],
       interactions: [],
       riskLevel: "low",
+      patientContext: {
+        conditions: [],
+      },
     });
 
     expect(result.provider).toBe("rule-based");
     expect(result.summary.toLowerCase()).toContain("no interaction evidence");
+    expect(result.overallRisk).toBe("low");
   });
 });

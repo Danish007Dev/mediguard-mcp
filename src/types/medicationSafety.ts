@@ -15,6 +15,28 @@ export interface InteractionFinding {
   evidence: string;
 }
 
+export interface InteractionPatientContext {
+  age?: number;
+  conditions: string[];
+  renalFunction?: string;
+}
+
+export interface LlmInteractionAnalysis {
+  drug1: string;
+  drug2: string;
+  severity: "low" | "moderate" | "high";
+  reasoning: string;
+  mechanism: string;
+  monitoringRecommendations: string[];
+  saferAlternatives: string[];
+}
+
+export interface InteractionLlmSynthesis {
+  overallRisk: "low" | "moderate" | "high";
+  contextualizedSummary: string;
+  interactionAnalyses: LlmInteractionAnalysis[];
+}
+
 export interface NormalizedMedication {
   input: string;
   normalizedName: string;
@@ -30,10 +52,12 @@ export interface CheckDrugInteractionsResult {
   analysisProvider: "groq" | "gemini" | "rule-based";
   riskLevel: RiskLevel;
   medications: string[];
+  patientContext?: InteractionPatientContext;
   normalizedMedications: NormalizedMedication[];
   interactions: InteractionFinding[];
   summary: string;
   analysisRecommendations: string[];
+  llmSynthesis?: InteractionLlmSynthesis;
   generatedAt: string;
 }
 

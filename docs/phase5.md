@@ -1,43 +1,63 @@
 ### Phase 5: LLM Integration & Reasoning (Days 17-20)
-**Goal**: Make intelligence layer truly "AI-powered"
+**Goal**: Strengthen Groq/Gemini clinical synthesis with strict JSON contracts, patient-context adaptation, and resilient cost-safe fallbacks.
 
-#### Use Claude API (or any free api like gemini) within your MCP server:
-```typescript
-// Inside your tool implementation
-async function analyzeDrugInteraction(drugs: string[]) {
-  // 1. Get raw interaction data from RxNorm/FDA APIs
-  const rawData = await fetchInteractionData(drugs);
-  
-  // 2. Use Claude to synthesize and explain
-  const prompt = `
-    You are a clinical pharmacist AI. Analyze these drug interactions:
-    
-    Medications: ${drugs.join(", ")}
-    Interaction Data: ${JSON.stringify(rawData)}
-    
-    Provide:
-    1. Risk level (High/Moderate/Low)
-    2. Clinical significance
-    3. Mechanism of interaction
-    4. Monitoring recommendations
-    5. Alternative suggestions if risk is high
-    
-    Format as JSON.
-  `;
-  
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
-    messages: [{ role: "user", content: prompt }]
-  });
-  
-  return parseAndValidate(response.content);
-}
+## Current Implementation (Started)
+
+Interaction synthesis now uses a structured prompt and validated response contract in `src/services/interactionSynthesisService.ts`, then merges LLM output into interaction findings in `src/services/rxNormOpenFdaDrugInteractionService.ts`.
+
+### 1) Prompt Template (Structured Input)
+
+LLM receives the exact contract-oriented payload shape:
+
+```text
+Drug list: ["warfarin", "ibuprofen"]
+Raw interactions: [{ drug1, drug2, severity_code, description }]
+Patient context: { age, conditions, renal_function }
+Baseline risk level: high|moderate|low
 ```
 
-**Why this demonstrates "AI Factor"**:
-- Rule-based systems can't explain WHY interaction is dangerous
-- Can't consider patient-specific context (age, renal function, etc.)
-- Can't suggest alternatives based on nuanced clinical reasoning
+Requested LLM tasks:
+1. Analyze severity (High/Moderate/Low) with reasoning.
+2. Explain clinical mechanism.
+3. Provide monitoring recommendations.
+4. Suggest safer alternatives for high-risk pairs.
+5. Adapt explanation to age, conditions, and renal function.
 
----
+### 2) Response Parsing and Validation
+
+Response is validated with `zod` before use:
+- `overallRisk: low | moderate | high`
+- `contextualizedSummary: string`
+- `recommendations: string[]`
+- `interactionAnalyses[]` with:
+  - `drug1`, `drug2`
+  - `severity: low | moderate | high`
+  - `reasoning`
+  - `mechanism`
+  - `monitoringRecommendations[]`
+  - `saferAlternatives[]`
+
+Validation enforces a safety guardrail: high-severity analyses must include at least one safer alternative.
+
+### 3) Fallback Logic (Provider + Deterministic)
+
+Fallback chain:
+1. Groq structured JSON
+2. Gemini structured JSON
+3. Rule-based deterministic synthesis
+
+If JSON parsing/validation fails for a provider, the next provider is attempted. If all fail, deterministic synthesis returns safe minimum outputs.
+
+### 4) Cost Optimization
+
+Implemented controls:
+- Prompt-cache (TTL) keyed by normalized synthesis input hash.
+- Interaction batching: all pairwise findings are synthesized in one request.
+- Token bounds: interaction payload capped to top `MAX_INTERACTIONS_FOR_PROMPT` entries.
+- No-LLM fast path: if there are no interactions, deterministic synthesis is used immediately.
+
+## Next Steps in Phase 5
+
+- Add explicit reasoning-trace metadata output (machine-consumable trace IDs/summary tags).
+- Add cost telemetry counters per provider (request count, cache hit rate).
+- Extend same strict JSON pattern across other synthesis services.

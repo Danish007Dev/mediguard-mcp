@@ -203,6 +203,9 @@ describe("SHARP context end-to-end tool flow", () => {
     expect(interactionService.checkDrugInteractions).toHaveBeenCalledWith(
       expect.arrayContaining(["warfarin", "ibuprofen"]),
       expect.any(String),
+      expect.objectContaining({
+        conditions: expect.arrayContaining(["chronic kidney disease"]),
+      }),
     );
 
     expect(polypharmacyService.analyzePolypharmacy).toHaveBeenCalledWith(

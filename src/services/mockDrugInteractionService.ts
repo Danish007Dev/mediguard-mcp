@@ -2,6 +2,7 @@ import { AppError } from "../errors/appError";
 import type { DrugInteractionService } from "./drugInteractionService";
 import type {
   CheckDrugInteractionsResult,
+  InteractionPatientContext,
   InteractionFinding,
   InteractionSeverity,
   RiskLevel,
@@ -109,6 +110,7 @@ export class MockDrugInteractionService implements DrugInteractionService {
   public async checkDrugInteractions(
     medications: string[],
     requestId: string,
+    patientContext?: InteractionPatientContext,
   ): Promise<CheckDrugInteractionsResult> {
     const normalizedMedications = normalizeMedicationNames(medications);
 
@@ -134,6 +136,7 @@ export class MockDrugInteractionService implements DrugInteractionService {
       analysisProvider: "rule-based",
       riskLevel,
       medications: normalizedMedications,
+      patientContext,
       normalizedMedications: normalizedMedications.map((name) => ({
         input: name,
         normalizedName: name,

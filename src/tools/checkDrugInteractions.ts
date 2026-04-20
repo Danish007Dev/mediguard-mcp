@@ -15,6 +15,18 @@ const severitySchema = z.enum([
   "contraindicated",
 ]);
 const riskLevelSchema = z.enum(["low", "medium", "high", "critical"]);
+const llmRiskSchema = z.enum(["low", "moderate", "high"]);
+
+const patientContextInputSchema = z
+  .object({
+    age: z.number().int().min(0).max(130).optional(),
+    conditions: z
+      .array(z.string().trim().min(1, "Condition names cannot be empty."))
+      .max(100)
+      .default([]),
+    renal_function: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
 
 export const checkDrugInteractionsInputSchema = {
   medications: z
@@ -28,12 +40,9 @@ export const checkDrugInteractionsInputSchema = {
       "Optional SHARP context for auto-fetching patient medications from a FHIR server.",
     ),
   patient_context: z
-    .object({})
-    .passthrough()
+    .union([patientContextInputSchema, z.object({}).passthrough()])
     .optional()
-    .describe(
-      "Deprecated generic context; use sharp_context for healthcare context propagation.",
-    ),
+    .describe("Optional patient context for LLM-adapted interaction reasoning."),
 };
 
 export const checkDrugInteractionsOutputSchema = {
@@ -42,6 +51,13 @@ export const checkDrugInteractionsOutputSchema = {
   analysisProvider: z.enum(["groq", "gemini", "rule-based"]),
   riskLevel: riskLevelSchema,
   medications: z.array(z.string()),
+  patientContext: z
+    .object({
+      age: z.number().int().optional(),
+      conditions: z.array(z.string()),
+      renalFunction: z.string().optional(),
+    })
+    .optional(),
   normalizedMedications: z.array(
     z.object({
       input: z.string(),
@@ -69,6 +85,23 @@ export const checkDrugInteractionsOutputSchema = {
   ),
   summary: z.string(),
   analysisRecommendations: z.array(z.string()),
+  llmSynthesis: z
+    .object({
+      overallRisk: llmRiskSchema,
+      contextualizedSummary: z.string(),
+      interactionAnalyses: z.array(
+        z.object({
+          drug1: z.string(),
+          drug2: z.string(),
+          severity: llmRiskSchema,
+          reasoning: z.string(),
+          mechanism: z.string(),
+          monitoringRecommendations: z.array(z.string()),
+          saferAlternatives: z.array(z.string()),
+        }),
+      ),
+    })
+    .optional(),
   generatedAt: z.string(),
 };
 
@@ -150,12 +183,37 @@ export async function executeCheckDrugInteractions(
 
     const hydratedMedications =
       sharpContext && dependencies.sharpContextService
-        ? await dependencies.sharpContextService.resolveMedications(
+        ? (await dependencies.sharpContextService.resolveMedications(
             sharpContext,
-          )
+          )) ?? []
+        : [];
+
+    const hydratedConditions =
+      sharpContext && dependencies.sharpContextService
+        ? (await dependencies.sharpContextService.resolveConditions(
+            sharpContext,
+          )) ?? []
         : [];
 
     const medications = asUnique([...args.medications, ...hydratedMedications]);
+
+    const inputPatientContext = patientContextInputSchema
+      .safeParse(args.patient_context)
+      .success
+      ? patientContextInputSchema.parse(args.patient_context)
+      : undefined;
+
+    const patientContext =
+      inputPatientContext || hydratedConditions.length > 0
+        ? {
+            age: inputPatientContext?.age,
+            conditions: asUnique([
+              ...(inputPatientContext?.conditions ?? []),
+              ...hydratedConditions,
+            ]),
+            renalFunction: inputPatientContext?.renal_function,
+          }
+        : undefined;
 
     if (medications.length < 2) {
       throw new AppError(
@@ -172,11 +230,14 @@ export async function executeCheckDrugInteractions(
       medicationCount: medications.length,
       usedSharpContext: Boolean(sharpContext),
       hydratedMedicationCount: hydratedMedications.length,
+      hydratedConditionCount: hydratedConditions.length,
+      hasPatientContext: Boolean(patientContext),
     });
 
     const result = await dependencies.service.checkDrugInteractions(
       medications,
       requestId,
+      patientContext,
     );
     const validatedResult = outputObjectSchema.parse(result);
 

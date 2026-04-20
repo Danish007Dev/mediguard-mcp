@@ -2,7 +2,9 @@ import { AppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import type {
   CheckDrugInteractionsResult,
+  InteractionLlmSynthesis,
   InteractionFinding,
+  InteractionPatientContext,
   InteractionSeverity,
   RiskLevel,
 } from "../types/medicationSafety";
@@ -111,6 +113,50 @@ function inferRiskLevel(interactions: InteractionFinding[]): RiskLevel {
   }
 
   return "low";
+}
+
+function mapLlmSeverityToInteractionSeverity(
+  severity: "low" | "moderate" | "high",
+): InteractionSeverity {
+  if (severity === "high") {
+    return "major";
+  }
+
+  if (severity === "moderate") {
+    return "moderate";
+  }
+
+  return "minor";
+}
+
+function mapLlmRiskToRiskLevel(risk: "low" | "moderate" | "high"): RiskLevel {
+  if (risk === "high") {
+    return "high";
+  }
+
+  if (risk === "moderate") {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function maxRiskLevel(left: RiskLevel, right: RiskLevel): RiskLevel {
+  const priority: Record<RiskLevel, number> = {
+    low: 1,
+    medium: 2,
+    high: 3,
+    critical: 4,
+  };
+
+  return priority[left] >= priority[right] ? left : right;
+}
+
+function interactionPairKey(drugs: string[]): string {
+  return drugs
+    .map((drug) => toSlug(drug))
+    .sort()
+    .join("::");
 }
 
 function classifySeverity(text: string): InteractionSeverity {
@@ -276,6 +322,7 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
   public async checkDrugInteractions(
     medications: string[],
     requestId: string,
+    patientContext?: InteractionPatientContext,
   ): Promise<CheckDrugInteractionsResult> {
     const deduped = asUniqueNames(medications);
     if (deduped.length < 2) {
@@ -303,18 +350,37 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
       medications: normalized.map((entry) => entry.normalizedName),
       interactions,
       riskLevel,
+      patientContext,
     });
+
+    const mergedInteractions = this.mergeSynthesisIntoFindings(
+      interactions,
+      synthesis,
+    );
+
+    const mergedRiskLevel = maxRiskLevel(
+      inferRiskLevel(mergedInteractions),
+      mapLlmRiskToRiskLevel(synthesis.overallRisk),
+    );
+
+    const llmSynthesis: InteractionLlmSynthesis = {
+      overallRisk: synthesis.overallRisk,
+      contextualizedSummary: synthesis.summary,
+      interactionAnalyses: synthesis.interactionAnalyses,
+    };
 
     return {
       requestId,
       source: "rxnorm-openfda",
       analysisProvider: synthesis.provider,
-      riskLevel,
+      riskLevel: mergedRiskLevel,
       medications: normalized.map((entry) => entry.normalizedName),
+      patientContext,
       normalizedMedications: normalized,
-      interactions,
+      interactions: mergedInteractions,
       summary: synthesis.summary,
       analysisRecommendations: synthesis.recommendations,
+      llmSynthesis,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -482,6 +548,52 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
     }
 
     return null;
+  }
+
+  private mergeSynthesisIntoFindings(
+    findings: InteractionFinding[],
+    synthesis: InteractionSynthesisResult,
+  ): InteractionFinding[] {
+    if (synthesis.interactionAnalyses.length === 0) {
+      return findings;
+    }
+
+    const merged = new Map<string, InteractionFinding>(
+      findings.map((finding) => [interactionPairKey(finding.drugs), finding]),
+    );
+
+    for (const analysis of synthesis.interactionAnalyses) {
+      const key = interactionPairKey([analysis.drug1, analysis.drug2]);
+      const existing = merged.get(key);
+      const mappedSeverity = mapLlmSeverityToInteractionSeverity(
+        analysis.severity,
+      );
+      const severity: InteractionSeverity =
+        existing?.severity === "contraindicated" && analysis.severity === "high"
+          ? "contraindicated"
+          : mappedSeverity;
+
+      const recommendations = Array.from(
+        new Set([
+          ...(existing?.recommendations ?? []),
+          ...analysis.monitoringRecommendations,
+          ...analysis.saferAlternatives,
+        ]),
+      ).slice(0, 8);
+
+      merged.set(key, {
+        drugs: [analysis.drug1, analysis.drug2],
+        severity,
+        mechanism: analysis.mechanism,
+        clinicalImpact: analysis.reasoning,
+        recommendations,
+        evidence:
+          existing?.evidence ??
+          "Structured LLM synthesis from RxNorm/OpenFDA interaction evidence.",
+      });
+    }
+
+    return Array.from(merged.values());
   }
 
   private async safeSynthesize(
