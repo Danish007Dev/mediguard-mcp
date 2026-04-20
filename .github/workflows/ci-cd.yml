@@ -1,0 +1,440 @@
+name: MediGuard MCP - CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Security checks - runs first
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Run secret scanner
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+      
+      - name: Check for hardcoded credentials
+        run: |
+          if grep -r "sk-ant-" . --exclude-dir=node_modules --exclude-dir=.git; then
+            echo "❌ Found hardcoded API keys!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets found"
+      
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=high
+
+  # Code quality checks
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+      
+      - name: Run TypeScript type check
+        run: npm run type-check
+      
+      - name: Check code formatting
+        run: npm run format:check
+
+  # HIPAA compliance check
+  hipaa-compliance:
+    name: HIPAA Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check for PHI in logs
+        run: |
+          # Search for common PHI patterns in logging statements
+          if grep -r "logger.*patient.*id" src/ --include="*.ts"; then
+            echo "⚠️  Warning: Possible PHI in logs detected"
+            echo "Review the following files:"
+            grep -r "logger.*patient.*id" src/ --include="*.ts"
+            exit 1
+          fi
+          echo "✅ No obvious PHI logging detected"
+      
+      - name: Check for sensitive data storage
+        run: |
+          if grep -r "new Map.*Patient" src/ --include="*.ts"; then
+            echo "⚠️  Warning: Possible patient data caching detected"
+            exit 1
+          fi
+          echo "✅ No patient data storage detected"
+
+  # Unit tests
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test:unit -- --coverage
+      
+      - name: Check test coverage
+        run: |
+          COVERAGE=$(npx nyc report --reporter=text-summary | grep "Lines" | awk '{print $3}' | sed 's/%//')
+          echo "Test coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "❌ Test coverage below 80%"
+            exit 1
+          fi
+          echo "✅ Test coverage meets requirement"
+      
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: unit-tests
+
+  # Integration tests
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Start mock FHIR server
+        run: |
+          docker run -d -p 8080:8080 \
+            -e hapi.fhir.default_encoding=JSON \
+            hapiproject/hapi:latest
+          # Wait for server to be ready
+          sleep 10
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          FHIR_ENDPOINT: http://localhost:8080/fhir
+      
+      - name: Stop mock FHIR server
+        if: always()
+        run: docker stop $(docker ps -q --filter ancestor=hapiproject/hapi:latest)
+
+  # Performance tests
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run performance benchmarks
+        run: npm run test:performance
+      
+      - name: Check response time requirements
+        run: |
+          # Parse benchmark results and verify < 3 second requirement
+          RESPONSE_TIME=$(cat performance-results.json | jq '.p95_response_time')
+          echo "P95 Response Time: ${RESPONSE_TIME}ms"
+          if (( $(echo "$RESPONSE_TIME > 3000" | bc -l) )); then
+            echo "❌ Response time exceeds 3 second requirement"
+            exit 1
+          fi
+          echo "✅ Performance requirements met"
+
+  # Safety validation
+  safety-validation:
+    name: Safety Validation
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run safety test suite
+        run: npm run test:safety
+      
+      - name: Validate critical interactions
+        run: |
+          # Test that known dangerous interactions are flagged
+          npm run test:safety:critical
+          
+          echo "✅ All critical drug interactions properly detected"
+      
+      - name: Check false positive rate
+        run: |
+          FALSE_POSITIVE_RATE=$(cat safety-results.json | jq '.false_positive_rate')
+          echo "False Positive Rate: ${FALSE_POSITIVE_RATE}%"
+          if (( $(echo "$FALSE_POSITIVE_RATE > 5" | bc -l) )); then
+            echo "⚠️  Warning: False positive rate above 5%"
+            # Don't fail, but warn
+          fi
+
+  # Build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        run: npm run build
+      
+      - name: Verify MCP server structure
+        run: |
+          # Check that compiled MCP server has required structure
+          if [ ! -f "dist/server.js" ]; then
+            echo "❌ server.js not found in dist"
+            exit 1
+          fi
+          echo "✅ Build artifacts verified"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/
+
+  # Documentation check
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check README exists
+        run: |
+          if [ ! -f "README.md" ]; then
+            echo "❌ README.md not found"
+            exit 1
+          fi
+          echo "✅ README.md exists"
+      
+      - name: Check API documentation
+        run: |
+          if [ ! -f "docs/API.md" ]; then
+            echo "⚠️  Warning: API.md not found in docs/"
+            # Don't fail early in development
+          fi
+      
+      - name: Validate tool descriptions
+        run: |
+          # Ensure all tools have proper descriptions
+          npm run validate:tools
+      
+      - name: Check for SHARP documentation
+        run: |
+          if ! grep -q "SHARP" README.md; then
+            echo "⚠️  Warning: SHARP extension not documented in README"
+          fi
+
+  # MCP validation
+  mcp-validation:
+    name: MCP Protocol Validation
+    runs-on: ubuntu-latest
+    needs: [build]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install MCP Inspector
+        run: npm install -g @modelcontextprotocol/inspector
+      
+      - name: Validate MCP server
+        run: |
+          # Start MCP server in background
+          node dist/server.js &
+          SERVER_PID=$!
+          
+          # Wait for server to start
+          sleep 5
+          
+          # Use MCP inspector to validate
+          mcp-inspector validate localhost:3000
+          
+          # Cleanup
+          kill $SERVER_PID
+      
+      - name: Test tool discovery
+        run: npm run test:mcp:discovery
+      
+      - name: Validate SHARP extension support
+        run: npm run test:sharp:compliance
+
+  # Deployment readiness check
+  deployment-check:
+    name: Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: [build, integration-test, safety-validation]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check environment variables template
+        run: |
+          if [ ! -f ".env.example" ]; then
+            echo "❌ .env.example not found"
+            exit 1
+          fi
+      
+      - name: Validate Prompt Opinion config
+        run: |
+          if [ ! -f "prompt-opinion.config.json" ]; then
+            echo "⚠️  Prompt Opinion config not found"
+            echo "This will be needed for marketplace deployment"
+          fi
+      
+      - name: Generate deployment checklist
+        run: |
+          echo "## Deployment Checklist" > deployment-status.md
+          echo "" >> deployment-status.md
+          echo "- [x] All tests passing" >> deployment-status.md
+          echo "- [x] Build successful" >> deployment-status.md
+          echo "- [x] Safety validation complete" >> deployment-status.md
+          echo "- [ ] Published to Prompt Opinion marketplace" >> deployment-status.md
+          echo "- [ ] Demo video recorded" >> deployment-status.md
+          
+          cat deployment-status.md
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const status = fs.readFileSync('deployment-status.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## CI/CD Status ✅\n\n${status}`
+            });
+
+  # Summary
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [security, lint, test, integration-test, performance, safety-validation, build, mcp-validation]
+    if: always()
+    
+    steps:
+      - name: Check job statuses
+        run: |
+          echo "## CI/CD Summary"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Tests: ${{ needs.test.result }}"
+          echo "Integration Tests: ${{ needs.integration-test.result }}"
+          echo "Performance: ${{ needs.performance.result }}"
+          echo "Safety: ${{ needs.safety-validation.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo "MCP Validation: ${{ needs.mcp-validation.result }}"
+          
+          # Fail if any critical job failed
+          if [[ "${{ needs.security.result }}" == "failure" ]] || \
+             [[ "${{ needs.test.result }}" == "failure" ]] || \
+             [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "❌ Critical jobs failed"
+            exit 1
+          fi
+          
+          echo "✅ All critical jobs passed"
