@@ -63,6 +63,8 @@ describe("PolypharmacySynthesisService", () => {
 
     expect(result.provider).toBe("groq");
     expect(result.summary).toContain("Groq");
+    expect(result.trace?.selectedProvider).toBe("groq");
+    expect(result.telemetry?.providerCalls.groq).toBeGreaterThan(0);
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
 
@@ -92,6 +94,7 @@ describe("PolypharmacySynthesisService", () => {
 
     expect(result.provider).toBe("gemini");
     expect(result.summary).toContain("Gemini");
+    expect(result.trace?.fallbackUsed).toBe(true);
   });
 
   it("uses rule-based summary when providers are unavailable", async () => {
@@ -115,6 +118,7 @@ describe("PolypharmacySynthesisService", () => {
 
     expect(result.provider).toBe("rule-based");
     expect(result.summary.toLowerCase()).toContain("identified");
+    expect(result.trace?.selectedProvider).toBe("rule-based");
   });
 
   it("rule-only service returns no-alert fallback when all flag groups are empty", async () => {

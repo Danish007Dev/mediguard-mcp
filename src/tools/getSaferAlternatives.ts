@@ -8,6 +8,38 @@ import type { SharpContextDataService } from "../services/sharpContextFhirServic
 import type { GetSaferAlternativesResult } from "../types/medicationSafety";
 
 const riskLevelSchema = z.enum(["low", "medium", "high", "critical"]);
+const llmTraceSchema = z
+  .object({
+    traceId: z.string(),
+    cacheHit: z.boolean(),
+    attemptedProviders: z.array(z.enum(["groq", "gemini", "rule-based"])),
+    selectedProvider: z.enum(["groq", "gemini", "rule-based"]),
+    fallbackUsed: z.boolean(),
+    promptInteractionCount: z.number().int().nonnegative(),
+    patientContextUsed: z.object({
+      age: z.boolean(),
+      conditions: z.boolean(),
+      renalFunction: z.boolean(),
+    }),
+  })
+  .optional();
+
+const llmTelemetrySchema = z
+  .object({
+    totalRequests: z.number().int().nonnegative(),
+    cacheHits: z.number().int().nonnegative(),
+    cacheHitRate: z.number().nonnegative(),
+    providerCalls: z.object({
+      groq: z.number().int().nonnegative(),
+      gemini: z.number().int().nonnegative(),
+      ruleBased: z.number().int().nonnegative(),
+    }),
+    estimatedPromptTokens: z.number().int().nonnegative(),
+    estimatedCompletionTokens: z.number().int().nonnegative(),
+    estimatedTotalTokens: z.number().int().nonnegative(),
+    estimatedSpendUsd: z.number().nonnegative(),
+  })
+  .optional();
 
 export const getSaferAlternativesInputSchema = {
   proposed_medication: z
@@ -76,6 +108,8 @@ export const getSaferAlternativesOutputSchema = {
   ),
   summary: z.string(),
   analysisRecommendations: z.array(z.string()),
+  llmTrace: llmTraceSchema,
+  llmTelemetry: llmTelemetrySchema,
   generatedAt: z.string(),
 };
 

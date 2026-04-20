@@ -398,6 +398,8 @@ export class ContraindicationService {
       contraindications: deduplicatedFindings,
       summary: synthesis.summary,
       analysisRecommendations: synthesis.recommendations,
+      llmTrace: synthesis.trace,
+      llmTelemetry: synthesis.telemetry,
       labelEvidence,
       generatedAt: new Date().toISOString(),
     };

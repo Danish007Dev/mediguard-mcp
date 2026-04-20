@@ -50,6 +50,8 @@ describe("ContraindicationSynthesisService", () => {
 
     expect(result.provider).toBe("groq");
     expect(result.summary).toContain("Groq");
+    expect(result.trace?.selectedProvider).toBe("groq");
+    expect(result.telemetry?.providerCalls.groq).toBeGreaterThan(0);
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
 
@@ -77,6 +79,7 @@ describe("ContraindicationSynthesisService", () => {
 
     expect(result.provider).toBe("gemini");
     expect(result.summary).toContain("Gemini");
+    expect(result.trace?.fallbackUsed).toBe(true);
   });
 
   it("falls back to rule-based summary when providers are unavailable", async () => {
@@ -101,6 +104,7 @@ describe("ContraindicationSynthesisService", () => {
     expect(result.provider).toBe("rule-based");
     expect(result.summary).toContain("1 finding");
     expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.trace?.selectedProvider).toBe("rule-based");
   });
 
   it("rule-only service returns no-finding fallback when contraindications are absent", async () => {

@@ -126,6 +126,8 @@ export interface AnalyzePolypharmacyResult {
   deprescribingOpportunities: DeprescribingOpportunity[];
   summary: string;
   analysisRecommendations: string[];
+  llmTrace?: InteractionLlmTrace;
+  llmTelemetry?: InteractionLlmTelemetry;
   generatedAt: string;
 }
 
@@ -168,6 +170,8 @@ export interface CheckContraindicationsResult {
   contraindications: ContraindicationFinding[];
   summary: string;
   analysisRecommendations: string[];
+  llmTrace?: InteractionLlmTrace;
+  llmTelemetry?: InteractionLlmTelemetry;
   labelEvidence: ContraindicationLabelEvidence;
   generatedAt: string;
 }
@@ -192,6 +196,8 @@ export interface GetSaferAlternativesResult {
   alternatives: SaferAlternativeOption[];
   summary: string;
   analysisRecommendations: string[];
+  llmTrace?: InteractionLlmTrace;
+  llmTelemetry?: InteractionLlmTelemetry;
   generatedAt: string;
 }
 
@@ -216,5 +222,7 @@ export interface ExplainMedicationSafetyResult {
   keyPoints: string[];
   followUpQuestions: string[];
   disclaimer: string;
+  llmTrace?: InteractionLlmTrace;
+  llmTelemetry?: InteractionLlmTelemetry;
   generatedAt: string;
 }

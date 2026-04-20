@@ -1,12 +1,19 @@
+import { createHash } from "node:crypto";
 import type { GeminiClient } from "../clients/geminiClient";
 import type { GroqClient } from "../clients/groqClient";
 import type { Logger } from "../logging/logger";
+import type {
+  InteractionLlmTelemetry,
+  InteractionLlmTrace,
+} from "../types/medicationSafety";
 import type {
   BeersCriteriaFlag,
   DeprescribingOpportunity,
   DuplicateTherapeuticClassFlag,
   RiskLevel,
 } from "../types/medicationSafety";
+import { TtlCache } from "../utils/ttlCache";
+import { LlmSynthesisObservability } from "./llmSynthesisObservability";
 
 type AnalysisProvider = "groq" | "gemini" | "rule-based";
 
@@ -25,6 +32,14 @@ export interface PolypharmacySynthesisResult {
   summary: string;
   recommendations: string[];
   provider: AnalysisProvider;
+  trace?: InteractionLlmTrace;
+  telemetry?: InteractionLlmTelemetry;
+}
+
+interface PolypharmacySynthesisCoreResult {
+  summary: string;
+  recommendations: string[];
+  provider: AnalysisProvider;
 }
 
 function toStringArray(value: unknown): string[] {
@@ -37,7 +52,7 @@ function toStringArray(value: unknown): string[] {
 
 function parseSynthesisResponse(
   payload: Record<string, unknown>,
-): PolypharmacySynthesisResult | null {
+): PolypharmacySynthesisCoreResult | null {
   const summaryRaw = payload["summary"];
   const recommendationsRaw = payload["recommendations"];
 
@@ -54,7 +69,7 @@ function parseSynthesisResponse(
 
 function buildRuleBasedSummary(
   input: PolypharmacySynthesisInput,
-): PolypharmacySynthesisResult {
+): PolypharmacySynthesisCoreResult {
   const alertCount =
     input.beersFlags.length +
     input.duplicateTherapeuticClasses.length +
@@ -83,6 +98,25 @@ function buildRuleBasedSummary(
   };
 }
 
+function toCacheKey(input: PolypharmacySynthesisInput): string {
+  const normalized = {
+    patientAge: input.patientAge,
+    patientConditions: [...input.patientConditions]
+      .map((entry) => entry.toLowerCase())
+      .sort(),
+    currentMedications: [...input.currentMedications]
+      .map((entry) => entry.toLowerCase())
+      .sort(),
+    riskLevel: input.riskLevel,
+    beersFlags: input.beersFlags,
+    duplicateTherapeuticClasses: input.duplicateTherapeuticClasses,
+    drugBurdenIndex: input.drugBurdenIndex,
+    deprescribingOpportunities: input.deprescribingOpportunities,
+  };
+
+  return createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+}
+
 function buildPrompt(input: PolypharmacySynthesisInput): {
   system: string;
   user: string;
@@ -108,18 +142,63 @@ function buildPrompt(input: PolypharmacySynthesisInput): {
  * Provider-fallback synthesis service for polypharmacy summaries.
  */
 export class PolypharmacySynthesisService {
+  private readonly cache = new TtlCache<string, PolypharmacySynthesisCoreResult>(
+    10 * 60 * 1000,
+  );
+  private readonly observability: LlmSynthesisObservability;
+
   public constructor(
     private readonly groqClient: GroqClient,
     private readonly geminiClient: GeminiClient,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    this.observability = new LlmSynthesisObservability(
+      this.logger,
+      "polypharmacy-synthesis",
+    );
+  }
 
   public async synthesize(
     input: PolypharmacySynthesisInput,
   ): Promise<PolypharmacySynthesisResult> {
+    const traceId = this.observability.startRequest();
+    const attemptedProviders: AnalysisProvider[] = [];
+    const promptItemCount =
+      input.beersFlags.length +
+      input.duplicateTherapeuticClasses.length +
+      input.deprescribingOpportunities.length;
+    const cacheKey = toCacheKey(input);
+    const cached = this.cache.get(cacheKey);
+
+    if (cached) {
+      this.observability.markCacheHit();
+      const trace = this.observability.buildTrace({
+        traceId,
+        cacheHit: true,
+        attemptedProviders: [cached.provider],
+        selectedProvider: cached.provider,
+        fallbackUsed: false,
+        promptItemCount,
+        contextSignals: {
+          age: true,
+          conditions: input.patientConditions.length > 0,
+          renalFunction: false,
+        },
+      });
+
+      return {
+        ...cached,
+        trace,
+        telemetry: this.observability.snapshotTelemetry(),
+      };
+    }
+
     const prompt = buildPrompt(input);
 
     if (this.groqClient.isConfigured()) {
+      attemptedProviders.push("groq");
+      this.observability.recordProviderAttempt("groq");
+
       try {
         const response = await this.groqClient.generateStructuredJson(
           prompt.system,
@@ -127,9 +206,36 @@ export class PolypharmacySynthesisService {
         );
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
-          return {
+          this.observability.recordTokenEstimate(
+            "groq",
+            prompt.system,
+            prompt.user,
+            response,
+          );
+          const result: PolypharmacySynthesisCoreResult = {
             ...parsed,
             provider: "groq",
+          };
+          this.cache.set(cacheKey, result);
+
+          const trace = this.observability.buildTrace({
+            traceId,
+            cacheHit: false,
+            attemptedProviders,
+            selectedProvider: "groq",
+            fallbackUsed: false,
+            promptItemCount,
+            contextSignals: {
+              age: true,
+              conditions: input.patientConditions.length > 0,
+              renalFunction: false,
+            },
+          });
+
+          return {
+            ...result,
+            trace,
+            telemetry: this.observability.snapshotTelemetry(),
           };
         }
 
@@ -147,6 +253,9 @@ export class PolypharmacySynthesisService {
     }
 
     if (this.geminiClient.isConfigured()) {
+      attemptedProviders.push("gemini");
+      this.observability.recordProviderAttempt("gemini");
+
       try {
         const response = await this.geminiClient.generateStructuredJson(
           prompt.system,
@@ -154,9 +263,36 @@ export class PolypharmacySynthesisService {
         );
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
-          return {
+          this.observability.recordTokenEstimate(
+            "gemini",
+            prompt.system,
+            prompt.user,
+            response,
+          );
+          const result: PolypharmacySynthesisCoreResult = {
             ...parsed,
             provider: "gemini",
+          };
+          this.cache.set(cacheKey, result);
+
+          const trace = this.observability.buildTrace({
+            traceId,
+            cacheHit: false,
+            attemptedProviders,
+            selectedProvider: "gemini",
+            fallbackUsed: attemptedProviders.includes("groq"),
+            promptItemCount,
+            contextSignals: {
+              age: true,
+              conditions: input.patientConditions.length > 0,
+              renalFunction: false,
+            },
+          });
+
+          return {
+            ...result,
+            trace,
+            telemetry: this.observability.snapshotTelemetry(),
           };
         }
 
@@ -173,7 +309,31 @@ export class PolypharmacySynthesisService {
       }
     }
 
-    return buildRuleBasedSummary(input);
+    attemptedProviders.push("rule-based");
+    this.observability.recordProviderAttempt("rule-based");
+
+    const result = buildRuleBasedSummary(input);
+    this.cache.set(cacheKey, result);
+
+    const trace = this.observability.buildTrace({
+      traceId,
+      cacheHit: false,
+      attemptedProviders,
+      selectedProvider: "rule-based",
+      fallbackUsed: attemptedProviders.length > 1,
+      promptItemCount,
+      contextSignals: {
+        age: true,
+        conditions: input.patientConditions.length > 0,
+        renalFunction: false,
+      },
+    });
+
+    return {
+      ...result,
+      trace,
+      telemetry: this.observability.snapshotTelemetry(),
+    };
   }
 }
 

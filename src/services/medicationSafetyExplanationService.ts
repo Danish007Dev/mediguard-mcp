@@ -147,6 +147,8 @@ export class MedicationSafetyExplanationService {
       keyPoints: synthesis.keyPoints,
       followUpQuestions: synthesis.followUpQuestions,
       disclaimer: synthesis.disclaimer,
+      llmTrace: synthesis.trace,
+      llmTelemetry: synthesis.telemetry,
       generatedAt: new Date().toISOString(),
     };
   }

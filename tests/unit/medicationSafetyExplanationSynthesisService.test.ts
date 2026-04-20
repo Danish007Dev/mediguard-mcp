@@ -50,6 +50,8 @@ describe("MedicationSafetyExplanationSynthesisService", () => {
 
     expect(result.provider).toBe("groq");
     expect(result.headline).toContain("Groq");
+    expect(result.trace?.selectedProvider).toBe("groq");
+    expect(result.telemetry?.providerCalls.groq).toBeGreaterThan(0);
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
 
@@ -82,6 +84,7 @@ describe("MedicationSafetyExplanationSynthesisService", () => {
 
     expect(result.provider).toBe("gemini");
     expect(result.headline).toContain("Gemini");
+    expect(result.trace?.fallbackUsed).toBe(true);
   });
 
   it("uses readable rule-based patient fallback when providers are unavailable", async () => {
@@ -106,6 +109,7 @@ describe("MedicationSafetyExplanationSynthesisService", () => {
     expect(result.provider).toBe("rule-based");
     expect(result.headline).toContain("warfarin");
     expect(result.explanation.toLowerCase()).toContain("serious bleeding");
+    expect(result.trace?.selectedProvider).toBe("rule-based");
   });
 
   it("rule-only service supports provider audience output", async () => {

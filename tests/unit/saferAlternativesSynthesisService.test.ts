@@ -48,6 +48,8 @@ describe("SaferAlternativesSynthesisService", () => {
 
     expect(result.provider).toBe("groq");
     expect(result.summary).toContain("Groq");
+    expect(result.trace?.selectedProvider).toBe("groq");
+    expect(result.telemetry?.providerCalls.groq).toBeGreaterThan(0);
     expect(geminiClient.generateStructuredJson).not.toHaveBeenCalled();
   });
 
@@ -77,6 +79,7 @@ describe("SaferAlternativesSynthesisService", () => {
 
     expect(result.provider).toBe("gemini");
     expect(result.summary).toContain("Gemini");
+    expect(result.trace?.fallbackUsed).toBe(true);
   });
 
   it("uses rule-based fallback when providers are unavailable", async () => {
@@ -100,6 +103,7 @@ describe("SaferAlternativesSynthesisService", () => {
 
     expect(result.provider).toBe("rule-based");
     expect(result.summary).toContain("Top-ranked option");
+    expect(result.trace?.selectedProvider).toBe("rule-based");
   });
 
   it("rule-only service returns no-option fallback when alternatives are empty", async () => {

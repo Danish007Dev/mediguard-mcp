@@ -328,6 +328,8 @@ export class PolypharmacyService {
       deprescribingOpportunities,
       summary: synthesis.summary,
       analysisRecommendations: synthesis.recommendations,
+      llmTrace: synthesis.trace,
+      llmTelemetry: synthesis.telemetry,
       generatedAt: new Date().toISOString(),
     };
   }

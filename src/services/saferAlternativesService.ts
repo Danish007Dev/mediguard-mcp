@@ -420,6 +420,8 @@ export class SaferAlternativesService {
       alternatives,
       summary: synthesis.summary,
       analysisRecommendations: synthesis.recommendations,
+      llmTrace: synthesis.trace,
+      llmTelemetry: synthesis.telemetry,
       generatedAt: new Date().toISOString(),
     };
   }

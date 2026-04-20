@@ -78,4 +78,13 @@ Trace records are also written through logger metadata for operational debugging
 
 ## Next Steps in Phase 5
 
-- Extend same strict JSON pattern across other synthesis services.
+- Extend strict JSON synthesis contracts to contraindication, polypharmacy, safer-alternatives, and explanation services.
+- Keep trace and telemetry fields consistent across all synthesis-capable tool outputs.
+
+## Status Update
+
+Phase 5 synthesis architecture is now consistent across interaction, contraindication, polypharmacy, safer alternatives, and explanation flows:
+
+- Provider fallback order remains Groq -> Gemini -> rule-based.
+- Each synthesis path emits `llmTrace` and `llmTelemetry` metadata.
+- Tool output schemas expose those metadata fields for downstream agents.

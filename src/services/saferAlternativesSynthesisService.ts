@@ -1,10 +1,17 @@
+import { createHash } from "node:crypto";
 import type { GeminiClient } from "../clients/geminiClient";
 import type { GroqClient } from "../clients/groqClient";
 import type { Logger } from "../logging/logger";
 import type {
+  InteractionLlmTelemetry,
+  InteractionLlmTrace,
+} from "../types/medicationSafety";
+import type {
   RiskLevel,
   SaferAlternativeOption,
 } from "../types/medicationSafety";
+import { TtlCache } from "../utils/ttlCache";
+import { LlmSynthesisObservability } from "./llmSynthesisObservability";
 
 type AnalysisProvider = "groq" | "gemini" | "rule-based";
 
@@ -16,6 +23,14 @@ export interface SaferAlternativesSynthesisInput {
 }
 
 export interface SaferAlternativesSynthesisResult {
+  summary: string;
+  recommendations: string[];
+  provider: AnalysisProvider;
+  trace?: InteractionLlmTrace;
+  telemetry?: InteractionLlmTelemetry;
+}
+
+interface SaferAlternativesSynthesisCoreResult {
   summary: string;
   recommendations: string[];
   provider: AnalysisProvider;
@@ -31,7 +46,7 @@ function toStringArray(value: unknown): string[] {
 
 function parseSynthesisResponse(
   payload: Record<string, unknown>,
-): SaferAlternativesSynthesisResult | null {
+): SaferAlternativesSynthesisCoreResult | null {
   const summaryRaw = payload["summary"];
   const recommendationsRaw = payload["recommendations"];
 
@@ -48,7 +63,7 @@ function parseSynthesisResponse(
 
 function buildRuleBasedSummary(
   input: SaferAlternativesSynthesisInput,
-): SaferAlternativesSynthesisResult {
+): SaferAlternativesSynthesisCoreResult {
   if (input.alternatives.length === 0) {
     return {
       provider: "rule-based",
@@ -79,6 +94,25 @@ function buildRuleBasedSummary(
   };
 }
 
+function toCacheKey(input: SaferAlternativesSynthesisInput): string {
+  const normalized = {
+    proposedMedication: input.proposedMedication.toLowerCase(),
+    riskLevel: input.riskLevel,
+    riskContext: [...input.riskContext].map((item) => item.toLowerCase()).sort(),
+    alternatives: input.alternatives.map((option) => ({
+      medication: option.medication.toLowerCase(),
+      therapeuticClass: option.therapeuticClass,
+      safetyScore: option.safetyScore,
+      formularyPreferred: option.formularyPreferred,
+      avoidsRisks: option.avoidsRisks,
+      cautionFlags: option.cautionFlags,
+      rationale: option.rationale,
+    })),
+  };
+
+  return createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
+}
+
 function buildPrompt(input: SaferAlternativesSynthesisInput): {
   system: string;
   user: string;
@@ -100,18 +134,60 @@ function buildPrompt(input: SaferAlternativesSynthesisInput): {
  * Provider-fallback synthesis service for safer-alternative summaries.
  */
 export class SaferAlternativesSynthesisService {
+  private readonly cache = new TtlCache<string, SaferAlternativesSynthesisCoreResult>(
+    10 * 60 * 1000,
+  );
+  private readonly observability: LlmSynthesisObservability;
+
   public constructor(
     private readonly groqClient: GroqClient,
     private readonly geminiClient: GeminiClient,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    this.observability = new LlmSynthesisObservability(
+      this.logger,
+      "safer-alternatives-synthesis",
+    );
+  }
 
   public async synthesize(
     input: SaferAlternativesSynthesisInput,
   ): Promise<SaferAlternativesSynthesisResult> {
+    const traceId = this.observability.startRequest();
+    const attemptedProviders: AnalysisProvider[] = [];
+    const promptItemCount = input.alternatives.length;
+    const cacheKey = toCacheKey(input);
+    const cached = this.cache.get(cacheKey);
+
+    if (cached) {
+      this.observability.markCacheHit();
+      const trace = this.observability.buildTrace({
+        traceId,
+        cacheHit: true,
+        attemptedProviders: [cached.provider],
+        selectedProvider: cached.provider,
+        fallbackUsed: false,
+        promptItemCount,
+        contextSignals: {
+          age: false,
+          conditions: input.riskContext.length > 0,
+          renalFunction: false,
+        },
+      });
+
+      return {
+        ...cached,
+        trace,
+        telemetry: this.observability.snapshotTelemetry(),
+      };
+    }
+
     const prompt = buildPrompt(input);
 
     if (this.groqClient.isConfigured()) {
+      attemptedProviders.push("groq");
+      this.observability.recordProviderAttempt("groq");
+
       try {
         const response = await this.groqClient.generateStructuredJson(
           prompt.system,
@@ -119,9 +195,36 @@ export class SaferAlternativesSynthesisService {
         );
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
-          return {
+          this.observability.recordTokenEstimate(
+            "groq",
+            prompt.system,
+            prompt.user,
+            response,
+          );
+          const result: SaferAlternativesSynthesisCoreResult = {
             ...parsed,
             provider: "groq",
+          };
+          this.cache.set(cacheKey, result);
+
+          const trace = this.observability.buildTrace({
+            traceId,
+            cacheHit: false,
+            attemptedProviders,
+            selectedProvider: "groq",
+            fallbackUsed: false,
+            promptItemCount,
+            contextSignals: {
+              age: false,
+              conditions: input.riskContext.length > 0,
+              renalFunction: false,
+            },
+          });
+
+          return {
+            ...result,
+            trace,
+            telemetry: this.observability.snapshotTelemetry(),
           };
         }
 
@@ -139,6 +242,9 @@ export class SaferAlternativesSynthesisService {
     }
 
     if (this.geminiClient.isConfigured()) {
+      attemptedProviders.push("gemini");
+      this.observability.recordProviderAttempt("gemini");
+
       try {
         const response = await this.geminiClient.generateStructuredJson(
           prompt.system,
@@ -146,9 +252,36 @@ export class SaferAlternativesSynthesisService {
         );
         const parsed = parseSynthesisResponse(response);
         if (parsed) {
-          return {
+          this.observability.recordTokenEstimate(
+            "gemini",
+            prompt.system,
+            prompt.user,
+            response,
+          );
+          const result: SaferAlternativesSynthesisCoreResult = {
             ...parsed,
             provider: "gemini",
+          };
+          this.cache.set(cacheKey, result);
+
+          const trace = this.observability.buildTrace({
+            traceId,
+            cacheHit: false,
+            attemptedProviders,
+            selectedProvider: "gemini",
+            fallbackUsed: attemptedProviders.includes("groq"),
+            promptItemCount,
+            contextSignals: {
+              age: false,
+              conditions: input.riskContext.length > 0,
+              renalFunction: false,
+            },
+          });
+
+          return {
+            ...result,
+            trace,
+            telemetry: this.observability.snapshotTelemetry(),
           };
         }
 
@@ -165,7 +298,31 @@ export class SaferAlternativesSynthesisService {
       }
     }
 
-    return buildRuleBasedSummary(input);
+    attemptedProviders.push("rule-based");
+    this.observability.recordProviderAttempt("rule-based");
+
+    const result = buildRuleBasedSummary(input);
+    this.cache.set(cacheKey, result);
+
+    const trace = this.observability.buildTrace({
+      traceId,
+      cacheHit: false,
+      attemptedProviders,
+      selectedProvider: "rule-based",
+      fallbackUsed: attemptedProviders.length > 1,
+      promptItemCount,
+      contextSignals: {
+        age: false,
+        conditions: input.riskContext.length > 0,
+        renalFunction: false,
+      },
+    });
+
+    return {
+      ...result,
+      trace,
+      telemetry: this.observability.snapshotTelemetry(),
+    };
   }
 }
 
