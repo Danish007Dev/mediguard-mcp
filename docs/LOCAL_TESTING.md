@@ -37,12 +37,15 @@ Example input payload:
 
 Expected result:
 
-- `riskLevel` should be `high` or `critical` with mock interactions.
-- `source` should be `mock`.
-- `structuredContent` should include medications, interactions, and summary.
+- `source` should be `rxnorm-openfda`.
+- `normalizedMedications` should include RxCUI mappings.
+- `analysisProvider` should be `groq`, `gemini`, or `rule-based`.
+- `structuredContent` should include interactions, summary, and `analysisRecommendations`.
 
 ## Troubleshooting
 
 - If Inspector cannot connect, rebuild with `npm run build` and retry.
 - If the tool returns an error, verify at least two medication names are provided.
 - Use `LOG_LEVEL=debug` in `.env` for verbose logs.
+- Add `GROQ_API_KEY` to enable primary LLM synthesis.
+- Add `GEMINI_API_KEY` to enable fallback synthesis when Groq is unavailable.

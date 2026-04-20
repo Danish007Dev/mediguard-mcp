@@ -50,7 +50,7 @@ npm install
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env and add your GROQ_API_KEY and GEMINI_API_KEY
 
 # Build the project
 npm run build
@@ -65,6 +65,27 @@ npm start
 # In a separate terminal
 npx @modelcontextprotocol/inspector node dist/server.js
 ```
+
+---
+
+## Clinical Safety Disclaimer
+
+MediGuard is a clinical decision-support tool and does not replace licensed clinical judgment.
+
+- Output must be reviewed by a qualified clinician or pharmacist before prescribing decisions.
+- The system may miss interactions when source data is incomplete, delayed, or unavailable.
+- In emergencies, follow institutional protocols and local standards of care immediately.
+
+See detailed safety language in [docs/SAFETY_DISCLAIMER.md](docs/SAFETY_DISCLAIMER.md).
+
+---
+
+## Documentation
+
+- API reference: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+- Agent integration patterns: [docs/AGENT_INTEGRATION_GUIDE.md](docs/AGENT_INTEGRATION_GUIDE.md)
+- Implementation notes: [docs/implementation_guide.md](docs/implementation_guide.md)
+- Development setup: [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md)
 
 ---
 
@@ -90,13 +111,18 @@ Analyzes potential drug-drug interactions across a medication list.
 **Output:**
 ```json
 {
-  "risk_level": "high",
+  "riskLevel": "high",
+  "analysisProvider": "groq",
+  "analysisRecommendations": [
+    "Avoid routine NSAID use when clinically feasible.",
+    "Increase INR and bleeding symptom monitoring if unavoidable."
+  ],
   "interactions": [
     {
       "drugs": ["warfarin", "ibuprofen"],
-      "severity": "high",
+      "severity": "major",
       "mechanism": "NSAIDs increase bleeding risk with anticoagulants",
-      "clinical_impact": "13x increased risk of GI bleeding",
+      "clinicalImpact": "13x increased risk of GI bleeding",
       "recommendations": [
         "Use acetaminophen instead of ibuprofen",
         "If NSAID necessary, add PPI prophylaxis",
@@ -104,7 +130,7 @@ Analyzes potential drug-drug interactions across a medication list.
       ]
     }
   ],
-  "explanation": "This combination carries significant bleeding risk..."
+  "summary": "This combination carries significant bleeding risk..."
 }
 ```
 
@@ -183,6 +209,11 @@ const result = await mcpClient.callTool('check_drug_interactions', {
 
 All data sources are **public APIs** - no proprietary databases required.
 
+### LLM Provider Strategy
+- **Primary provider:** Groq (fast, low-cost synthesis for tool responses)
+- **Fallback provider:** Gemini (automatic failover)
+- **Final degradation path:** deterministic rule-based synthesis when both providers are unavailable
+
 ---
 
 ## 🏗️ Architecture
@@ -208,7 +239,9 @@ All data sources are **public APIs** - no proprietary databases required.
 │  - Multi-agent workflows                         │
 ├─────────────────────────────────────────────────┤
 │  Intelligence Layer                              │
-│  - Claude API for clinical reasoning             │
+│  - Groq primary synthesis                        │
+│  - Gemini fallback synthesis                     │
+│  - Rule-based degradation                        │
 │  - Context-aware analysis                        │
 │  - Natural language explanations                 │
 ├─────────────────────────────────────────────────┤
@@ -328,7 +361,7 @@ We validate against known dangerous interactions:
 **Optimization Techniques:**
 - Aggressive caching (drugs don't change often)
 - Parallel API calls where possible
-- Prompt caching for Claude API
+- Multi-provider LLM fallback (Groq -> Gemini -> rules)
 - Connection pooling for FHIR endpoints
 
 ---
@@ -350,7 +383,7 @@ MediGuard is published on the [Prompt Opinion Marketplace](https://promptopinion
 ```bash
 # Docker deployment
 docker build -t mediguard-mcp .
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=your-key mediguard-mcp
+docker run -p 3000:3000 -e GROQ_API_KEY=your-key -e GEMINI_API_KEY=your-key mediguard-mcp
 
 # Or use npm
 npm run build
@@ -405,7 +438,8 @@ Built for the **Agents Assemble Healthcare AI Hackathon** by [Prompt Opinion](ht
 
 **Technologies:**
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) - Anthropic
-- [Claude API](https://www.anthropic.com/claude) - Anthropic
+- [Groq API](https://console.groq.com/docs/overview) - Groq
+- [Gemini API](https://ai.google.dev/) - Google
 - [FHIR R4](http://hl7.org/fhir/) - HL7 International
 
 ---
