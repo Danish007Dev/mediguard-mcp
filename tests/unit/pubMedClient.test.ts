@@ -17,6 +17,25 @@ describe("PubMedClient", () => {
     });
   }
 
+  function createClientWithOverrides(
+    overrides: Partial<{
+      timeoutMs: number;
+      maxRetries: number;
+      contactEmail: string;
+      apiKey: string;
+    }>,
+  ): PubMedClient {
+    return new PubMedClient({
+      baseUrl: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
+      timeoutMs: overrides.timeoutMs ?? 1000,
+      cacheTtlMs: 60_000,
+      logger,
+      maxRetries: overrides.maxRetries,
+      contactEmail: overrides.contactEmail,
+      apiKey: overrides.apiKey,
+    });
+  }
+
   it("throws validation error for empty drug names", async () => {
     const client = createClient();
 
@@ -389,5 +408,57 @@ describe("PubMedClient", () => {
     const result = await client.getInteractionEvidence("drug-g", "drug-h");
 
     expect(result).toBeNull();
+  });
+
+  it("sends configured email and api key query params", async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["66666"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["66666"],
+              "66666": {
+                title: "Prospective cohort interaction report",
+                source: "Safety Journal",
+                pubdate: "2020",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClientWithOverrides({
+      contactEmail: "team@example.com",
+      apiKey: "demo-pubmed-key",
+    });
+
+    await client.getInteractionEvidence("drug-x", "drug-y");
+
+    const firstCall = fetchSpy.mock.calls[0]?.[0];
+    expect(typeof firstCall).toBe("string");
+
+    if (typeof firstCall === "string") {
+      const url = new URL(firstCall);
+      expect(url.searchParams.get("email")).toBe("team@example.com");
+      expect(url.searchParams.get("api_key")).toBe("demo-pubmed-key");
+    }
   });
 });

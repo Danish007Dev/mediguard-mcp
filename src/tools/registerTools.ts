@@ -67,8 +67,11 @@ export function registerTools(server: McpServer, logger: Logger): void {
 
   const pubMedClient = new PubMedClient({
     baseUrl: env.PUBMED_API_URL,
-    timeoutMs: env.API_TIMEOUT_MS,
+    timeoutMs: env.PUBMED_TIMEOUT_MS,
     cacheTtlMs,
+    maxRetries: env.PUBMED_MAX_RETRIES,
+    contactEmail: env.PUBMED_CONTACT_EMAIL,
+    apiKey: env.PUBMED_API_KEY,
     logger: logger.child({ component: "pubmed-client" }),
   });
 

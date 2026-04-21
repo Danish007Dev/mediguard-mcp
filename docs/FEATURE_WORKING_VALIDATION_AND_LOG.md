@@ -57,11 +57,10 @@ Reference: `docs/PHASE_6_7_ROADMAP.md` Feature 1 testing requirements.
 ### Requirement 1: Test with 50 known drug pairs
 Status: Done (automated run completed).
 
-Result snapshot (2026-04-21):
+Result snapshot (latest 2026-04-21):
 - Total pairs tested: 50
-- PubMed request success: 49/50
-- Non-empty PubMed result set: 49/50
-- One transient network failure (`TypeError: fetch failed`) on `atorvastatin + clarithromycin`
+- PubMed request success: 50/50
+- Non-empty PubMed result set: 50/50
 
 Execution method:
 - Direct PubMed E-Utilities validation sweep executed in terminal using 50 interaction-focused pairs.
@@ -69,10 +68,10 @@ Execution method:
 ### Requirement 2: Verify PubMed API response time (<500ms)
 Status: Checked, currently not met in this environment.
 
-Result snapshot (2026-04-21):
-- Average latency: 739ms
-- P95 latency: 970ms
-- Under 500ms: 3/50
+Result snapshot (latest 2026-04-21):
+- Average latency: 592ms
+- P95 latency: 831ms
+- Under 500ms: 21/50
 
 Notes:
 - First request was a cold-start outlier (~5.0s).
@@ -118,7 +117,19 @@ Observed error classes during validation:
 Mitigations now implemented in code:
 - Exponential retry/backoff for transient network errors and 429/5xx responses.
 - `tool` query parameter added for NCBI-friendly request identification.
+- Optional `email` and `api_key` query parameters supported for NCBI best-practice identification and better rate handling.
 - Retry-aware logging and error context (attempt counts) for easier troubleshooting.
+
+PubMed-only timeout and retry exception (recommended for now):
+- Set `PUBMED_TIMEOUT_MS=15000` (or 20000 if your network is high-latency)
+- Set `PUBMED_MAX_RETRIES=4`
+- Set `PUBMED_CONTACT_EMAIL=<team-email>`
+- Set `PUBMED_API_KEY=<ncbi-api-key>` if available
+
+Other robust options if intermittent errors persist:
+- Add a scheduled warm-cache job for top interaction pairs so common lookups avoid external latency.
+- Add a local evidence snapshot fallback (nightly refreshed PMIDs per high-risk pairs).
+- Introduce a circuit-breaker window to temporarily suppress repeated PubMed calls during upstream outages.
 
 ## Upcoming features log registry
 
@@ -168,4 +179,16 @@ Use this section for clinical/manual completion records.
 - Under 500ms: 18/50
 - Average latency: 610ms
 - P95 latency: 920ms
+- Failures: none
+
+
+
+### 2026-04-21T09:45:09.142Z
+- Command: npm run validate:feature1
+- Pair count: 50
+- Success count: 50/50
+- Non-empty hit count: 50/50
+- Under 500ms: 21/50
+- Average latency: 592ms
+- P95 latency: 831ms
 - Failures: none

@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 const PUBMED_BASE_URL =
   (process.env.PUBMED_API_URL ??
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils").replace(/\/$/, "");
-const REQUEST_TIMEOUT_MS = Number(process.env.API_TIMEOUT_MS ?? "5000");
+const REQUEST_TIMEOUT_MS = Number(process.env.PUBMED_TIMEOUT_MS ?? "15000");
+const PUBMED_CONTACT_EMAIL = process.env.PUBMED_CONTACT_EMAIL?.trim() ?? "";
+const PUBMED_API_KEY = process.env.PUBMED_API_KEY?.trim() ?? "";
 const DOC_PATH = resolve("docs", "FEATURE_WORKING_VALIDATION_AND_LOG.md");
 
 const DRUG_PAIRS = [
@@ -79,6 +81,12 @@ async function runSearch(drugA, drugB) {
   url.searchParams.set("retmax", "5");
   url.searchParams.set("sort", "relevance");
   url.searchParams.set("tool", "mediguard-mcp-feature1-validator");
+  if (PUBMED_CONTACT_EMAIL) {
+    url.searchParams.set("email", PUBMED_CONTACT_EMAIL);
+  }
+  if (PUBMED_API_KEY) {
+    url.searchParams.set("api_key", PUBMED_API_KEY);
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => {

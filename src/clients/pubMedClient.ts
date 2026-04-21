@@ -14,6 +14,7 @@ interface PubMedClientConfig {
   maxRetries?: number;
   toolName?: string;
   contactEmail?: string;
+  apiKey?: string;
 }
 
 function normalizeWhitespace(value: string): string {
@@ -92,6 +93,7 @@ export class PubMedClient {
   private readonly maxRetries: number;
   private readonly toolName: string;
   private readonly contactEmail?: string;
+  private readonly apiKey?: string;
 
   public constructor(private readonly config: PubMedClientConfig) {
     this.cache = new TtlCache(config.cacheTtlMs);
@@ -102,6 +104,7 @@ export class PubMedClient {
     this.contactEmail = config.contactEmail
       ? normalizeWhitespace(config.contactEmail)
       : undefined;
+    this.apiKey = config.apiKey ? normalizeWhitespace(config.apiKey) : undefined;
   }
 
   public async getInteractionEvidence(
@@ -232,6 +235,9 @@ export class PubMedClient {
       url.searchParams.set("tool", this.toolName);
       if (this.contactEmail) {
         url.searchParams.set("email", this.contactEmail);
+      }
+      if (this.apiKey) {
+        url.searchParams.set("api_key", this.apiKey);
       }
 
       const controller = new AbortController();
