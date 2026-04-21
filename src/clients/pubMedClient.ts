@@ -11,6 +11,9 @@ interface PubMedClientConfig {
   timeoutMs: number;
   cacheTtlMs: number;
   logger: Logger;
+  maxRetries?: number;
+  toolName?: string;
+  contactEmail?: string;
 }
 
 function normalizeWhitespace(value: string): string {
@@ -71,14 +74,34 @@ function pairKey(drug1: string, drug2: string): string {
     .join("::");
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetryStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
 /**
  * Lightweight PubMed E-Utilities client for drug-pair evidence retrieval.
  */
 export class PubMedClient {
   private readonly cache: TtlCache<string, PubMedInteractionEvidenceSummary | null>;
+  private readonly maxRetries: number;
+  private readonly toolName: string;
+  private readonly contactEmail?: string;
 
   public constructor(private readonly config: PubMedClientConfig) {
     this.cache = new TtlCache(config.cacheTtlMs);
+    this.maxRetries = Math.max(0, config.maxRetries ?? 2);
+    this.toolName =
+      normalizeWhitespace(config.toolName ?? "mediguard-mcp") ||
+      "mediguard-mcp";
+    this.contactEmail = config.contactEmail
+      ? normalizeWhitespace(config.contactEmail)
+      : undefined;
   }
 
   public async getInteractionEvidence(
@@ -197,68 +220,131 @@ export class PubMedClient {
     endpoint: string,
     params: Record<string, string>,
   ): Promise<Record<string, unknown>> {
-    const url = new URL(`${this.config.baseUrl.replace(/\/$/, "")}/${endpoint}`);
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      const url = new URL(
+        `${this.config.baseUrl.replace(/\/$/, "")}/${endpoint}`,
+      );
 
-    for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
-    }
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+      }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, this.config.timeoutMs);
+      url.searchParams.set("tool", this.toolName);
+      if (this.contactEmail) {
+        url.searchParams.set("email", this.contactEmail);
+      }
 
-    try {
-      const response = await fetch(url.toString(), {
-        method: "GET",
-        signal: controller.signal,
-        headers: {
-          Accept: "application/json",
-        },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, this.config.timeoutMs);
 
-      if (!response.ok) {
-        throw new AppError(
-          `PubMed request failed: ${response.status} ${response.statusText}`,
-          "PUBMED_API_ERROR",
-          {
-            status: response.status,
-            endpoint,
+      try {
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
           },
-        );
-      }
-
-      const payload = (await response.json()) as unknown;
-      if (!isRecord(payload)) {
-        throw new AppError("PubMed response was not an object.", "PUBMED_PARSE_ERROR", {
-          endpoint,
         });
-      }
 
-      return payload;
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
+        if (!response.ok) {
+          if (
+            shouldRetryStatus(response.status) &&
+            attempt < this.maxRetries
+          ) {
+            const delayMs = 150 * 2 ** attempt;
+            this.config.logger.warn(
+              "Transient PubMed response status. Retrying request.",
+              {
+                endpoint,
+                status: response.status,
+                attempt: attempt + 1,
+                nextDelayMs: delayMs,
+              },
+            );
+            await sleep(delayMs);
+            continue;
+          }
 
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new AppError("PubMed request timed out.", "PUBMED_TIMEOUT", {
+          throw new AppError(
+            `PubMed request failed: ${response.status} ${response.statusText}`,
+            "PUBMED_API_ERROR",
+            {
+              status: response.status,
+              endpoint,
+              attempt: attempt + 1,
+            },
+          );
+        }
+
+        const payload = (await response.json()) as unknown;
+        if (!isRecord(payload)) {
+          throw new AppError(
+            "PubMed response was not an object.",
+            "PUBMED_PARSE_ERROR",
+            {
+              endpoint,
+              attempt: attempt + 1,
+            },
+          );
+        }
+
+        return payload;
+      } catch (error) {
+        const isAbort = error instanceof Error && error.name === "AbortError";
+        const isTransientNetwork =
+          error instanceof Error &&
+          /(fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|network)/i.test(
+            error.message,
+          );
+
+        if ((isAbort || isTransientNetwork) && attempt < this.maxRetries) {
+          const delayMs = 150 * 2 ** attempt;
+          this.config.logger.warn(
+            "Transient PubMed request error. Retrying request.",
+            {
+              endpoint,
+              attempt: attempt + 1,
+              nextDelayMs: delayMs,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
+          await sleep(delayMs);
+          continue;
+        }
+
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        if (isAbort) {
+          throw new AppError("PubMed request timed out.", "PUBMED_TIMEOUT", {
+            endpoint,
+            timeoutMs: this.config.timeoutMs,
+            attempt: attempt + 1,
+          });
+        }
+
+        this.config.logger.warn("PubMed request failed", {
           endpoint,
-          timeoutMs: this.config.timeoutMs,
+          attempt: attempt + 1,
+          error: error instanceof Error ? error.message : String(error),
         });
+
+        throw new AppError("PubMed request failed.", "PUBMED_API_ERROR", {
+          endpoint,
+          cause: error instanceof Error ? error.message : String(error),
+          attempt: attempt + 1,
+        });
+      } finally {
+        clearTimeout(timeout);
       }
-
-      this.config.logger.warn("PubMed request failed", {
-        endpoint,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw new AppError("PubMed request failed.", "PUBMED_API_ERROR", {
-        endpoint,
-        cause: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      clearTimeout(timeout);
     }
+
+    throw new AppError("PubMed request exhausted retries.", "PUBMED_API_ERROR", {
+      endpoint,
+      retries: this.maxRetries,
+    });
   }
 }

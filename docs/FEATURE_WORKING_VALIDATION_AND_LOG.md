@@ -105,6 +105,21 @@ Commands executed (2026-04-21):
 - `npm test` -> pass (32 passed suites, 1 skipped)
 - `npm run test:unit -- pubMedClient` after added classification tests -> pass
 
+Recurring automation command:
+- `npm run validate:feature1` -> runs 50-pair PubMed sweep and appends a timestamped summary in this document.
+
+## PubMed client error analysis
+
+Observed error classes during validation:
+- `TypeError: fetch failed` from transient network/TLS/DNS connectivity issues.
+- Timeout errors (`PUBMED_TIMEOUT`) when E-Utilities latency exceeds local timeout configuration.
+- 429/5xx server responses from PubMed service-side throttling or temporary instability.
+
+Mitigations now implemented in code:
+- Exponential retry/backoff for transient network errors and 429/5xx responses.
+- `tool` query parameter added for NCBI-friendly request identification.
+- Retry-aware logging and error context (attempt counts) for easier troubleshooting.
+
 ## Upcoming features log registry
 
 Use this table to track upcoming features, their use, tests, and readiness.
@@ -142,3 +157,15 @@ Use this section for clinical/manual completion records.
 - Sample size reviewed:
 - Accuracy notes:
 - Required prompt/model adjustments:
+
+## Automated validation run history
+
+### 2026-04-21T09:31:23.608Z
+- Command: npm run validate:feature1
+- Pair count: 50
+- Success count: 50/50
+- Non-empty hit count: 50/50
+- Under 500ms: 18/50
+- Average latency: 610ms
+- P95 latency: 920ms
+- Failures: none

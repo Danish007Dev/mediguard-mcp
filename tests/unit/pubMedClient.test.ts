@@ -128,7 +128,7 @@ describe("PubMedClient", () => {
     const abortError = new Error("aborted");
     abortError.name = "AbortError";
 
-    jest.spyOn(globalThis, "fetch").mockRejectedValueOnce(abortError);
+    jest.spyOn(globalThis, "fetch").mockRejectedValue(abortError);
 
     const client = createClient();
 
@@ -140,7 +140,7 @@ describe("PubMedClient", () => {
   });
 
   it("maps non-OK status to PUBMED_API_ERROR", async () => {
-    jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("error", {
         status: 503,
         statusText: "Service Unavailable",
@@ -154,6 +154,97 @@ describe("PubMedClient", () => {
     ).rejects.toMatchObject({
       code: "PUBMED_API_ERROR",
     });
+  });
+
+  it("retries on transient network failure and succeeds", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["44444"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["44444"],
+              "44444": {
+                title: "Retrospective study of adverse events",
+                source: "Clinical Review",
+                pubdate: "2022",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-r", "drug-s");
+
+    expect(result).not.toBeNull();
+    expect(result?.studyCount).toBe(1);
+  });
+
+  it("retries on 503 responses before succeeding", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response("busy", {
+          status: 503,
+          statusText: "Service Unavailable",
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["55555"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["55555"],
+              "55555": {
+                title: "Cohort outcomes for medication interaction",
+                source: "Medicine",
+                pubdate: "2021",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-t", "drug-u");
+
+    expect(result).not.toBeNull();
+    expect(result?.studyCount).toBe(1);
   });
 
   it("infers evidence level B from cohort-style studies", async () => {

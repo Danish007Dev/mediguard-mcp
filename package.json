@@ -15,6 +15,7 @@
     "test:safety": "jest tests/safety",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "validate:feature1": "node scripts/validateFeature1PubMed.mjs",
     "lint": "eslint src tests --ext .ts",
     "lint:fix": "eslint src tests --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
