@@ -70,6 +70,9 @@ export function registerTools(server: McpServer, logger: Logger): void {
     timeoutMs: env.PUBMED_TIMEOUT_MS,
     cacheTtlMs,
     maxRetries: env.PUBMED_MAX_RETRIES,
+    circuitBreakerFailureThreshold:
+      env.PUBMED_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    circuitBreakerCooldownMs: env.PUBMED_CIRCUIT_BREAKER_COOLDOWN_MS,
     contactEmail: env.PUBMED_CONTACT_EMAIL,
     apiKey: env.PUBMED_API_KEY,
     logger: logger.child({ component: "pubmed-client" }),

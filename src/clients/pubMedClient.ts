@@ -15,6 +15,8 @@ interface PubMedClientConfig {
   toolName?: string;
   contactEmail?: string;
   apiKey?: string;
+  circuitBreakerFailureThreshold?: number;
+  circuitBreakerCooldownMs?: number;
 }
 
 function normalizeWhitespace(value: string): string {
@@ -94,6 +96,10 @@ export class PubMedClient {
   private readonly toolName: string;
   private readonly contactEmail?: string;
   private readonly apiKey?: string;
+  private readonly circuitBreakerFailureThreshold: number;
+  private readonly circuitBreakerCooldownMs: number;
+  private consecutiveFailures = 0;
+  private circuitOpenUntilEpochMs = 0;
 
   public constructor(private readonly config: PubMedClientConfig) {
     this.cache = new TtlCache(config.cacheTtlMs);
@@ -105,6 +111,14 @@ export class PubMedClient {
       ? normalizeWhitespace(config.contactEmail)
       : undefined;
     this.apiKey = config.apiKey ? normalizeWhitespace(config.apiKey) : undefined;
+    this.circuitBreakerFailureThreshold = Math.max(
+      1,
+      config.circuitBreakerFailureThreshold ?? 5,
+    );
+    this.circuitBreakerCooldownMs = Math.max(
+      1000,
+      config.circuitBreakerCooldownMs ?? 60_000,
+    );
   }
 
   public async getInteractionEvidence(
@@ -125,6 +139,11 @@ export class PubMedClient {
     const cached = this.cache.get(cacheKey);
     if (cached !== undefined) {
       return cached;
+    }
+
+    if (this.isCircuitOpen()) {
+      // Keep interaction checks responsive during transient upstream incidents.
+      return null;
     }
 
     const pmids = await this.searchPmids(left, right);
@@ -223,6 +242,18 @@ export class PubMedClient {
     endpoint: string,
     params: Record<string, string>,
   ): Promise<Record<string, unknown>> {
+    if (this.isCircuitOpen()) {
+      throw new AppError(
+        "PubMed circuit breaker is open.",
+        "PUBMED_CIRCUIT_OPEN",
+        {
+          endpoint,
+          openUntil: new Date(this.circuitOpenUntilEpochMs).toISOString(),
+          consecutiveFailures: this.consecutiveFailures,
+        },
+      );
+    }
+
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       const url = new URL(
         `${this.config.baseUrl.replace(/\/$/, "")}/${endpoint}`,
@@ -296,6 +327,7 @@ export class PubMedClient {
           );
         }
 
+        this.resetFailureState();
         return payload;
       } catch (error) {
         const isAbort = error instanceof Error && error.name === "AbortError";
@@ -321,10 +353,14 @@ export class PubMedClient {
         }
 
         if (error instanceof AppError) {
+          if (error.code !== "PUBMED_CIRCUIT_OPEN") {
+            this.recordFailure(endpoint, error.code);
+          }
           throw error;
         }
 
         if (isAbort) {
+          this.recordFailure(endpoint, "PUBMED_TIMEOUT");
           throw new AppError("PubMed request timed out.", "PUBMED_TIMEOUT", {
             endpoint,
             timeoutMs: this.config.timeoutMs,
@@ -338,6 +374,7 @@ export class PubMedClient {
           error: error instanceof Error ? error.message : String(error),
         });
 
+        this.recordFailure(endpoint, "PUBMED_API_ERROR");
         throw new AppError("PubMed request failed.", "PUBMED_API_ERROR", {
           endpoint,
           cause: error instanceof Error ? error.message : String(error),
@@ -351,6 +388,31 @@ export class PubMedClient {
     throw new AppError("PubMed request exhausted retries.", "PUBMED_API_ERROR", {
       endpoint,
       retries: this.maxRetries,
+    });
+  }
+
+  private isCircuitOpen(): boolean {
+    return Date.now() < this.circuitOpenUntilEpochMs;
+  }
+
+  private resetFailureState(): void {
+    this.consecutiveFailures = 0;
+    this.circuitOpenUntilEpochMs = 0;
+  }
+
+  private recordFailure(endpoint: string, errorCode: string): void {
+    this.consecutiveFailures += 1;
+
+    if (this.consecutiveFailures < this.circuitBreakerFailureThreshold) {
+      return;
+    }
+
+    this.circuitOpenUntilEpochMs = Date.now() + this.circuitBreakerCooldownMs;
+    this.config.logger.warn("PubMed circuit breaker opened", {
+      endpoint,
+      errorCode,
+      consecutiveFailures: this.consecutiveFailures,
+      cooldownMs: this.circuitBreakerCooldownMs,
     });
   }
 }

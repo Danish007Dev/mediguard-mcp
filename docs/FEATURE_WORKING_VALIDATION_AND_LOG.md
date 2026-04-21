@@ -10,7 +10,7 @@ This is the living document for:
 ## Feature 1: Evidence-Based Recommendations with PubMed
 
 ### Current implementation status
-Status: Implemented and integrated.
+Status: Closed for engineering scope (implemented, integrated, and hardened).
 
 Implemented in:
 - `src/clients/pubMedClient.ts`
@@ -69,9 +69,9 @@ Execution method:
 Status: Checked, currently not met in this environment.
 
 Result snapshot (latest 2026-04-21):
-- Average latency: 592ms
-- P95 latency: 831ms
-- Under 500ms: 21/50
+- Average latency: 588ms
+- P95 latency: 964ms
+- Under 500ms: 27/50
 
 Notes:
 - First request was a cold-start outlier (~5.0s).
@@ -137,7 +137,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 
 | Feature ID | Feature | Main use | Planned tool/output | Test plan | Current status |
 |---|---|---|---|---|---|
-| F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | In progress (engineering done, manual checks pending) |
+| F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | Closed (engineering scope complete; manual clinical checks pending) |
 | F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | New safety score pipeline and dashboard view | Algorithm unit tests + scenario tests + performance <100ms | Planned |
 | F3 | What-If Simulator | Compare risk before/after medication changes | New simulation tool output with risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | Planned |
 | F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | Decision trace capture and dashboard artifact | Trace completeness tests + perf tests + PHI safety checks | Planned |
@@ -152,6 +152,9 @@ Use this table to track upcoming features, their use, tests, and readiness.
 - Added/updated tests for Feature 1.
 - Ran 50-pair PubMed validation sweep.
 - Confirmed Feature 1 requirement status: 2 done, 1 checked-not-met, 2 pending-manual.
+- Added PubMed-specific timeout/retry settings and optional NCBI email/API key support.
+- Implemented PubMed circuit breaker (failure-threshold + cooldown) to suppress repeated upstream outage noise.
+- Re-ran validation and updated evidence snapshots.
 
 ## Manual validation sign-off section
 
@@ -191,4 +194,28 @@ Use this section for clinical/manual completion records.
 - Under 500ms: 21/50
 - Average latency: 592ms
 - P95 latency: 831ms
+- Failures: none
+
+
+
+### 2026-04-21T13:37:22.878Z
+- Command: npm run validate:feature1
+- Pair count: 50
+- Success count: 50/50
+- Non-empty hit count: 50/50
+- Under 500ms: 25/50
+- Average latency: 648ms
+- P95 latency: 1213ms
+- Failures: none
+
+
+
+### 2026-04-21T13:41:05.255Z
+- Command: npm run validate:feature1
+- Pair count: 50
+- Success count: 50/50
+- Non-empty hit count: 50/50
+- Under 500ms: 27/50
+- Average latency: 588ms
+- P95 latency: 964ms
 - Failures: none

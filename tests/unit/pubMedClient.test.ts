@@ -21,6 +21,8 @@ describe("PubMedClient", () => {
     overrides: Partial<{
       timeoutMs: number;
       maxRetries: number;
+      circuitBreakerFailureThreshold: number;
+      circuitBreakerCooldownMs: number;
       contactEmail: string;
       apiKey: string;
     }>,
@@ -31,6 +33,8 @@ describe("PubMedClient", () => {
       cacheTtlMs: 60_000,
       logger,
       maxRetries: overrides.maxRetries,
+      circuitBreakerFailureThreshold: overrides.circuitBreakerFailureThreshold,
+      circuitBreakerCooldownMs: overrides.circuitBreakerCooldownMs,
       contactEmail: overrides.contactEmail,
       apiKey: overrides.apiKey,
     });
@@ -460,5 +464,87 @@ describe("PubMedClient", () => {
       expect(url.searchParams.get("email")).toBe("team@example.com");
       expect(url.searchParams.get("api_key")).toBe("demo-pubmed-key");
     }
+  });
+
+  it("opens circuit after repeated failures and short-circuits subsequent calls", async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new TypeError("fetch failed"));
+
+    const client = createClientWithOverrides({
+      maxRetries: 0,
+      circuitBreakerFailureThreshold: 1,
+      circuitBreakerCooldownMs: 60_000,
+    });
+
+    await expect(
+      client.getInteractionEvidence("drug-a", "drug-b"),
+    ).rejects.toMatchObject({
+      code: "PUBMED_API_ERROR",
+    });
+
+    const second = await client.getInteractionEvidence("drug-c", "drug-d");
+
+    expect(second).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows calls again after circuit cooldown", async () => {
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, "now").mockImplementation(() => now);
+
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["77777"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["77777"],
+              "77777": {
+                title: "Systematic review for interaction evidence",
+                source: "Journal of Safety",
+                pubdate: "2023",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClientWithOverrides({
+      maxRetries: 0,
+      circuitBreakerFailureThreshold: 1,
+      circuitBreakerCooldownMs: 1,
+    });
+
+    await expect(
+      client.getInteractionEvidence("drug-e", "drug-f"),
+    ).rejects.toMatchObject({
+      code: "PUBMED_API_ERROR",
+    });
+
+    now += 2_000;
+
+    const recovered = await client.getInteractionEvidence("drug-g", "drug-h");
+
+    expect(recovered).not.toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 });
