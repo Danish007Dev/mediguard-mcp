@@ -5,7 +5,10 @@ import { AppError, toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
-import type { PatientSafetyScoreResult } from "../types/medicationSafety";
+import type {
+  PatientSafetyDashboardArtifact,
+  PatientSafetyScoreResult,
+} from "../types/medicationSafety";
 
 const riskLevelSchema = z.enum(["low", "medium", "high", "critical"]);
 
@@ -80,6 +83,58 @@ export const calculatePatientSafetyScoreOutputSchema = {
     }),
   ),
   potentialOptimizedScore: z.number().int().min(0).max(100),
+  dashboardArtifact: z.object({
+    version: z.literal("1.0.0"),
+    generatedAt: z.string(),
+    scoreCard: z.object({
+      score: z.number().int().min(0).max(100),
+      grade: z.enum(["A", "B", "C", "D", "F"]),
+      riskLevel: riskLevelSchema,
+      potentialOptimizedScore: z.number().int().min(0).max(100),
+      optimizationGap: z.number().int().min(0).max(100),
+      medicationCount: z.number().int().positive(),
+    }),
+    severityChart: z.array(
+      z.object({
+        severity: z.enum(["minor", "moderate", "major", "contraindicated"]),
+        count: z.number().int().nonnegative(),
+      }),
+    ),
+    deductionBreakdown: z.array(
+      z.object({
+        category: z.string(),
+        points: z.number().int().nonnegative(),
+        rationale: z.string(),
+      }),
+    ),
+    opportunityQueue: z.array(
+      z.object({
+        title: z.string(),
+        action: z.string(),
+        expectedPointsGain: z.number().int().nonnegative(),
+      }),
+    ),
+    flagsPanel: z.object({
+      beersFlagCount: z.number().int().nonnegative(),
+      duplicateClassCount: z.number().int().nonnegative(),
+      beersFlags: z.array(
+        z.object({
+          medication: z.string(),
+          reason: z.string(),
+          severity: z.enum(["moderate", "major"]),
+          evidence: z.string(),
+        }),
+      ),
+      duplicateTherapeuticClasses: z.array(
+        z.object({
+          className: z.string(),
+          medications: z.array(z.string()),
+          risk: z.enum(["low", "medium", "high"]),
+          rationale: z.string(),
+        }),
+      ),
+    }),
+  }),
   summary: z.string(),
   generatedAt: z.string(),
 };
@@ -145,6 +200,53 @@ function buildResponseText(result: PatientSafetyScoreResult): string {
   lines.push(`Potential optimized score: ${result.potentialOptimizedScore}/100`);
 
   return lines.join("\n");
+}
+
+function buildDashboardArtifact(
+  result: PatientSafetyScoreResult,
+): PatientSafetyDashboardArtifact {
+  return {
+    version: "1.0.0",
+    generatedAt: result.generatedAt,
+    scoreCard: {
+      score: result.score,
+      grade: result.grade,
+      riskLevel: result.riskLevel,
+      potentialOptimizedScore: result.potentialOptimizedScore,
+      optimizationGap: Math.max(0, result.potentialOptimizedScore - result.score),
+      medicationCount: result.medicationCount,
+    },
+    severityChart: [
+      {
+        severity: "contraindicated",
+        count: result.interactionSummary.contraindicated,
+      },
+      {
+        severity: "major",
+        count: result.interactionSummary.major,
+      },
+      {
+        severity: "moderate",
+        count: result.interactionSummary.moderate,
+      },
+      {
+        severity: "minor",
+        count: result.interactionSummary.minor,
+      },
+    ],
+    deductionBreakdown: [...result.deductions].sort(
+      (left, right) => right.points - left.points,
+    ),
+    opportunityQueue: [...result.improvementOpportunities].sort(
+      (left, right) => right.expectedPointsGain - left.expectedPointsGain,
+    ),
+    flagsPanel: {
+      beersFlagCount: result.beersFlags.length,
+      duplicateClassCount: result.duplicateTherapeuticClasses.length,
+      beersFlags: result.beersFlags,
+      duplicateTherapeuticClasses: result.duplicateTherapeuticClasses,
+    },
+  };
 }
 
 /**
@@ -217,7 +319,10 @@ export async function executeCalculatePatientSafetyScore(
       requestId,
     );
 
-    const validatedResult = outputObjectSchema.parse(result);
+    const validatedResult = outputObjectSchema.parse({
+      ...result,
+      dashboardArtifact: buildDashboardArtifact(result),
+    });
 
     toolLogger.info("Patient safety score calculation completed", {
       score: validatedResult.score,

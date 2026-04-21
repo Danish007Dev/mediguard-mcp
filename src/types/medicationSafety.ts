@@ -164,6 +164,45 @@ export interface SafetyScoreImprovementOpportunity {
   expectedPointsGain: number;
 }
 
+export interface PatientSafetyDashboardSeverityDatum {
+  severity: InteractionSeverity;
+  count: number;
+}
+
+export interface PatientSafetyDashboardDeductionDatum {
+  category: string;
+  points: number;
+  rationale: string;
+}
+
+export interface PatientSafetyDashboardOpportunityDatum {
+  title: string;
+  action: string;
+  expectedPointsGain: number;
+}
+
+export interface PatientSafetyDashboardArtifact {
+  version: "1.0.0";
+  generatedAt: string;
+  scoreCard: {
+    score: number;
+    grade: "A" | "B" | "C" | "D" | "F";
+    riskLevel: RiskLevel;
+    potentialOptimizedScore: number;
+    optimizationGap: number;
+    medicationCount: number;
+  };
+  severityChart: PatientSafetyDashboardSeverityDatum[];
+  deductionBreakdown: PatientSafetyDashboardDeductionDatum[];
+  opportunityQueue: PatientSafetyDashboardOpportunityDatum[];
+  flagsPanel: {
+    beersFlagCount: number;
+    duplicateClassCount: number;
+    beersFlags: BeersCriteriaFlag[];
+    duplicateTherapeuticClasses: DuplicateTherapeuticClassFlag[];
+  };
+}
+
 export interface PatientSafetyScoreResult {
   requestId: string;
   source: "rules-interactions";
@@ -184,6 +223,7 @@ export interface PatientSafetyScoreResult {
   duplicateTherapeuticClasses: DuplicateTherapeuticClassFlag[];
   improvementOpportunities: SafetyScoreImprovementOpportunity[];
   potentialOptimizedScore: number;
+  dashboardArtifact?: PatientSafetyDashboardArtifact;
   summary: string;
   generatedAt: string;
 }

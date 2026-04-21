@@ -138,7 +138,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 | Feature ID | Feature | Main use | Planned tool/output | Test plan | Current status |
 |---|---|---|---|---|---|
 | F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | Closed (engineering scope complete; manual clinical checks pending) |
-| F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | `calculate_patient_safety_score` tool + dashboard-ready scoring payload | Algorithm unit tests + scenario tests + performance <100ms | In progress (tool/service + tests implemented) |
+| F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | `calculate_patient_safety_score` tool + dashboard-ready scoring payload | Algorithm unit tests + scenario tests + performance <100ms | In progress (robust unit/tool/performance coverage added; manual chart/pharmacist validation pending) |
 | F3 | What-If Simulator | Compare risk before/after medication changes | New simulation tool output with risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | Planned |
 | F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | Decision trace capture and dashboard artifact | Trace completeness tests + perf tests + PHI safety checks | Planned |
 | F5 | Real-Time Multi-Agent Demo | Show cross-agent orchestration for medication safety | Demo agent workflow with MCP calls | End-to-end scripted scenario tests | Planned |
@@ -156,6 +156,8 @@ Use this table to track upcoming features, their use, tests, and readiness.
 - Implemented PubMed circuit breaker (failure-threshold + cooldown) to suppress repeated upstream outage noise.
 - Re-ran validation and updated evidence snapshots.
 - Started Feature 2 implementation: added patient safety score service and MCP tool scaffold with unit tests.
+- Hardened Feature 2 testing: added deterministic scoring checks, duplicate-med normalization checks, edge-case tests (0 meds and 30+ meds), SHARP hydration tool-path coverage, and a safety-performance baseline test.
+- Added Feature 2 dashboard artifact layer in `calculate_patient_safety_score` output (`dashboardArtifact`) for UI-ready score cards, severity chart data, deduction breakdowns, and action queues.
 
 ## Manual validation sign-off section
 

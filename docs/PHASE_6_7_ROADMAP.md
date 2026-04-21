@@ -363,9 +363,9 @@ OPTIMIZED SCORE: 93/100 ✅ (Grade: A, Risk: LOW)
 **Testing Requirements**:
 - [ ] Validate against 100 real patient charts (de-identified)
 - [ ] Cross-check with pharmacist safety assessments
-- [ ] Verify Beers Criteria accuracy (100% match)
-- [ ] Test edge cases (0 meds, 30+ meds)
-- [ ] Performance: <100ms calculation time
+- [x] Verify Beers Criteria accuracy (100% match in current automated rule test set; full clinical chart validation pending)
+- [x] Test edge cases (0 meds, 30+ meds)
+- [x] Performance: <100ms calculation time (p95 achieved in mocked-backend safety test)
 
 ---
 

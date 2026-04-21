@@ -191,7 +191,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
     {
       title: "Calculate Patient Safety Score",
       description:
-        "Calculates a 0-100 medication safety score using interaction severity, polypharmacy burden, Beers-style older-adult risks, and duplicate therapeutic classes. SHARP-compliant context propagation is supported via sharp_context.",
+        "Calculates a 0-100 medication safety score using interaction severity, polypharmacy burden, Beers-style older-adult risks, and duplicate therapeutic classes. Returns dashboardArtifact panels for score cards, severity charting, and opportunity queues. SHARP-compliant context propagation is supported via sharp_context.",
       inputSchema: calculatePatientSafetyScoreInputSchema,
       outputSchema: calculatePatientSafetyScoreOutputSchema,
       annotations: {
