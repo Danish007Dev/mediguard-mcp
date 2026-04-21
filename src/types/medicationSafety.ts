@@ -31,6 +31,26 @@ export interface LlmInteractionAnalysis {
   saferAlternatives: string[];
 }
 
+export type EvidenceLevel = "A" | "B" | "C" | "D";
+
+export interface PubMedStudyReference {
+  pmid: string;
+  title: string;
+  journal: string;
+  published: string;
+  link: string;
+}
+
+export interface PubMedInteractionEvidenceSummary {
+  drug1: string;
+  drug2: string;
+  evidenceLevel: EvidenceLevel;
+  studyCount: number;
+  confidence: number;
+  studies: PubMedStudyReference[];
+  synthesis: string;
+}
+
 export interface InteractionLlmTrace {
   traceId: string;
   cacheHit: boolean;
@@ -64,6 +84,7 @@ export interface InteractionLlmSynthesis {
   overallRisk: "low" | "moderate" | "high";
   contextualizedSummary: string;
   interactionAnalyses: LlmInteractionAnalysis[];
+  evidenceSummaries?: PubMedInteractionEvidenceSummary[];
   trace?: InteractionLlmTrace;
   telemetry?: InteractionLlmTelemetry;
 }

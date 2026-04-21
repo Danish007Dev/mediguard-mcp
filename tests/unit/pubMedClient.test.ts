@@ -1,0 +1,302 @@
+import { Logger } from "../../src/logging/logger";
+import { PubMedClient } from "../../src/clients/pubMedClient";
+
+describe("PubMedClient", () => {
+  const logger = new Logger("error", { test: true });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function createClient(): PubMedClient {
+    return new PubMedClient({
+      baseUrl: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
+      timeoutMs: 1000,
+      cacheTtlMs: 60_000,
+      logger,
+    });
+  }
+
+  it("throws validation error for empty drug names", async () => {
+    const client = createClient();
+
+    await expect(client.getInteractionEvidence("", "ibuprofen")).rejects.toMatchObject(
+      {
+        code: "VALIDATION_ERROR",
+      },
+    );
+  });
+
+  it("returns normalized evidence summary from esearch/esummary payloads", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["12345", "67890"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["12345", "67890"],
+              "12345": {
+                title: "Randomized trial of warfarin and ibuprofen interaction",
+                fulljournalname: "Clinical Journal",
+                pubdate: "2022",
+              },
+              "67890": {
+                title: "Systematic review of anticoagulant and NSAID bleeding",
+                source: "Pharmacotherapy",
+                pubdate: "2021",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("warfarin", "ibuprofen");
+
+    expect(result).not.toBeNull();
+    expect(result?.evidenceLevel).toBe("A");
+    expect(result?.studyCount).toBe(2);
+    expect(result?.studies[0]?.pmid).toBe("12345");
+    expect(result?.studies[0]?.link).toBe(
+      "https://pubmed.ncbi.nlm.nih.gov/12345/",
+    );
+  });
+
+  it("returns cached result for repeated lookups of the same pair", async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["12345"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["12345"],
+              "12345": {
+                title: "Case report for interaction",
+                source: "Journal",
+                pubdate: "2020",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+
+    const first = await client.getInteractionEvidence("warfarin", "ibuprofen");
+    const second = await client.getInteractionEvidence("ibuprofen", "warfarin");
+
+    expect(first).not.toBeNull();
+    expect(second).toEqual(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("maps AbortError to PUBMED_TIMEOUT", async () => {
+    const abortError = new Error("aborted");
+    abortError.name = "AbortError";
+
+    jest.spyOn(globalThis, "fetch").mockRejectedValueOnce(abortError);
+
+    const client = createClient();
+
+    await expect(
+      client.getInteractionEvidence("warfarin", "ibuprofen"),
+    ).rejects.toMatchObject({
+      code: "PUBMED_TIMEOUT",
+    });
+  });
+
+  it("maps non-OK status to PUBMED_API_ERROR", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("error", {
+        status: 503,
+        statusText: "Service Unavailable",
+      }),
+    );
+
+    const client = createClient();
+
+    await expect(
+      client.getInteractionEvidence("warfarin", "ibuprofen"),
+    ).rejects.toMatchObject({
+      code: "PUBMED_API_ERROR",
+    });
+  });
+
+  it("infers evidence level B from cohort-style studies", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["11111"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["11111"],
+              "11111": {
+                title: "Prospective cohort evaluation of interaction risk",
+                source: "Clinical Outcomes",
+                pubdate: "2022",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-a", "drug-b");
+
+    expect(result?.evidenceLevel).toBe("B");
+  });
+
+  it("infers evidence level C from case-report studies", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["22222"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["22222"],
+              "22222": {
+                title: "Case report of severe interaction in outpatient setting",
+                source: "Case Medicine",
+                pubdate: "2021",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-c", "drug-d");
+
+    expect(result?.evidenceLevel).toBe("C");
+  });
+
+  it("infers evidence level D when no stronger study keywords exist", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            esearchresult: {
+              idlist: ["33333"],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: {
+              uids: ["33333"],
+              "33333": {
+                title: "Drug safety update from clinical newsletter",
+                source: "Practice Update",
+                pubdate: "2020",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-e", "drug-f");
+
+    expect(result?.evidenceLevel).toBe("D");
+  });
+
+  it("returns null when esearch returns no PMIDs", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          esearchresult: {
+            idlist: [],
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const client = createClient();
+    const result = await client.getInteractionEvidence("drug-g", "drug-h");
+
+    expect(result).toBeNull();
+  });
+});

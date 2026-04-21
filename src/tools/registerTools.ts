@@ -27,6 +27,7 @@ import {
   executeExplainMedicationSafety,
 } from "./explainMedicationSafety";
 import { OpenFdaClient } from "../clients/openFdaClient";
+import { PubMedClient } from "../clients/pubMedClient";
 import { RxNormClient } from "../clients/rxNormClient";
 import { DailyMedClient } from "../clients/dailyMedClient";
 import { FhirR4Client } from "../clients/fhirR4Client";
@@ -62,6 +63,13 @@ export function registerTools(server: McpServer, logger: Logger): void {
     timeoutMs: env.API_TIMEOUT_MS,
     cacheTtlMs,
     logger: logger.child({ component: "openfda-client" }),
+  });
+
+  const pubMedClient = new PubMedClient({
+    baseUrl: env.PUBMED_API_URL,
+    timeoutMs: env.API_TIMEOUT_MS,
+    cacheTtlMs,
+    logger: logger.child({ component: "pubmed-client" }),
   });
 
   const dailyMedClient = new DailyMedClient({
@@ -111,6 +119,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
     openFdaClient,
     logger.child({ component: "interaction-service" }),
     synthesisService,
+    pubMedClient,
   );
 
   const polypharmacySynthesisService = new PolypharmacySynthesisService(

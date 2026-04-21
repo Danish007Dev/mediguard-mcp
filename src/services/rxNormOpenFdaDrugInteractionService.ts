@@ -5,11 +5,13 @@ import type {
   InteractionLlmSynthesis,
   InteractionFinding,
   InteractionPatientContext,
+  PubMedInteractionEvidenceSummary,
   InteractionSeverity,
   RiskLevel,
 } from "../types/medicationSafety";
 import type { RxNormNormalizationResult } from "../types/rxnorm";
 import type { OpenFdaClient, OpenFdaLabelData } from "../clients/openFdaClient";
+import type { PubMedClient } from "../clients/pubMedClient";
 import type { RxNormClient } from "../clients/rxNormClient";
 import type { DrugInteractionService } from "./drugInteractionService";
 import {
@@ -314,6 +316,7 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
     private readonly openFdaClient: OpenFdaClient,
     private readonly logger: Logger,
     private readonly synthesisService: InteractionSynthesisEngine = new RuleOnlyInteractionSynthesisService(),
+    private readonly pubMedClient?: PubMedClient,
   ) {}
 
   /**
@@ -363,10 +366,16 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
       mapLlmRiskToRiskLevel(synthesis.overallRisk),
     );
 
+    const evidenceSummaries = await this.getPubMedEvidenceSummaries(
+      mergedInteractions,
+    );
+
     const llmSynthesis: InteractionLlmSynthesis = {
       overallRisk: synthesis.overallRisk,
       contextualizedSummary: synthesis.summary,
       interactionAnalyses: synthesis.interactionAnalyses,
+      evidenceSummaries:
+        evidenceSummaries.length > 0 ? evidenceSummaries : undefined,
       trace: synthesis.trace,
       telemetry: synthesis.telemetry,
     };
@@ -613,5 +622,45 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
 
       return new RuleOnlyInteractionSynthesisService().synthesize(input);
     }
+  }
+
+  private async getPubMedEvidenceSummaries(
+    interactions: InteractionFinding[],
+  ): Promise<PubMedInteractionEvidenceSummary[]> {
+    if (!this.pubMedClient || interactions.length === 0) {
+      return [];
+    }
+
+    const pubMedClient = this.pubMedClient;
+
+    const pairwiseCandidates = interactions
+      .filter((interaction) => interaction.drugs.length >= 2)
+      .slice(0, 10);
+
+    const summaries = await Promise.all(
+      pairwiseCandidates.map(async (interaction) => {
+        const [drug1, drug2] = interaction.drugs;
+        if (!drug1 || !drug2) {
+          return null;
+        }
+
+        try {
+          return await pubMedClient.getInteractionEvidence(drug1, drug2);
+        } catch (error) {
+          this.logger.warn("PubMed evidence lookup failed for interaction pair", {
+            drug1,
+            drug2,
+            error: error instanceof Error ? error.message : String(error),
+          });
+
+          return null;
+        }
+      }),
+    );
+
+    return summaries.filter(
+      (summary): summary is PubMedInteractionEvidenceSummary =>
+        Boolean(summary),
+    );
   }
 }

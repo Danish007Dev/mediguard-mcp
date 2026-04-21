@@ -23,6 +23,10 @@ const envSchema = z.object({
     .string()
     .url()
     .default("https://dailymed.nlm.nih.gov/dailymed"),
+  PUBMED_API_URL: z
+    .string()
+    .url()
+    .default("https://eutils.ncbi.nlm.nih.gov/entrez/eutils"),
   GROQ_API_URL: z.string().url().default("https://api.groq.com/openai/v1"),
   GROQ_API_KEY: optionalString,
   GROQ_MODEL: z.string().min(1).default("llama-3.3-70b-versatile"),

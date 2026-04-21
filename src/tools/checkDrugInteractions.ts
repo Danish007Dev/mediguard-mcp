@@ -100,6 +100,27 @@ export const checkDrugInteractionsOutputSchema = {
           saferAlternatives: z.array(z.string()),
         }),
       ),
+      evidenceSummaries: z
+        .array(
+          z.object({
+            drug1: z.string(),
+            drug2: z.string(),
+            evidenceLevel: z.enum(["A", "B", "C", "D"]),
+            studyCount: z.number().int().nonnegative(),
+            confidence: z.number().min(0).max(1),
+            studies: z.array(
+              z.object({
+                pmid: z.string(),
+                title: z.string(),
+                journal: z.string(),
+                published: z.string(),
+                link: z.string().url(),
+              }),
+            ),
+            synthesis: z.string(),
+          }),
+        )
+        .optional(),
       trace: z
         .object({
           traceId: z.string().uuid(),

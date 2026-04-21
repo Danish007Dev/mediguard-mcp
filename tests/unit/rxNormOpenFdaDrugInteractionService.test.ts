@@ -25,6 +25,7 @@ describe("RxNormOpenFdaDrugInteractionService", () => {
   function buildService(options?: {
     openFdaImplementation?: (drugName: string) => unknown;
     synthesisImplementation?: () => unknown;
+    pubMedImplementation?: (drug1: string, drug2: string) => unknown;
   }): RxNormOpenFdaDrugInteractionService {
     const rxNormClient = {
       normalizeDrugName: jest
@@ -53,11 +54,20 @@ describe("RxNormOpenFdaDrugInteractionService", () => {
         }
       : undefined;
 
+    const pubMedClient = options?.pubMedImplementation
+      ? {
+          getInteractionEvidence: jest.fn(async (drug1: string, drug2: string) =>
+            options.pubMedImplementation?.(drug1, drug2),
+          ),
+        }
+      : undefined;
+
     return new RxNormOpenFdaDrugInteractionService(
       rxNormClient as never,
       openFdaClient as never,
       logger,
       synthesisService as never,
+      pubMedClient as never,
     );
   }
 
@@ -222,6 +232,77 @@ describe("RxNormOpenFdaDrugInteractionService", () => {
 
     expect(result.analysisProvider).toBe("rule-based");
     expect(result.summary.length).toBeGreaterThan(0);
+  });
+
+  it("includes PubMed evidence summaries when a client is configured", async () => {
+    const service = buildService({
+      openFdaImplementation: (drugName) => {
+        if (drugName === "warfarin") {
+          return {
+            queriedDrugName: "warfarin",
+            setId: "SET-WARFARIN",
+            aliases: ["warfarin"],
+            interactionText: [
+              "Concurrent use with ibuprofen increases bleeding risk and serious hemorrhage.",
+            ],
+            warningText: [],
+          };
+        }
+
+        return {
+          queriedDrugName: "ibuprofen",
+          setId: "SET-IBUPROFEN",
+          aliases: ["ibuprofen"],
+          interactionText: [],
+          warningText: [],
+        };
+      },
+      pubMedImplementation: () => ({
+        drug1: "warfarin",
+        drug2: "ibuprofen",
+        evidenceLevel: "A",
+        studyCount: 2,
+        confidence: 0.71,
+        studies: [
+          {
+            pmid: "12345678",
+            title: "Warfarin and ibuprofen interaction trial",
+            journal: "Clinical Pharmacology",
+            published: "2023",
+            link: "https://pubmed.ncbi.nlm.nih.gov/12345678/",
+          },
+        ],
+        synthesis: "PubMed evidence suggests increased bleeding risk.",
+      }),
+    });
+
+    const result = await service.checkDrugInteractions(
+      ["warfarin", "ibuprofen"],
+      "12222222-2222-4222-8222-222222222222",
+    );
+
+    expect(result.llmSynthesis?.evidenceSummaries).toBeDefined();
+    expect(result.llmSynthesis?.evidenceSummaries?.[0]).toMatchObject({
+      evidenceLevel: "A",
+      studyCount: 2,
+    });
+  });
+
+  it("continues without PubMed evidence when lookup fails", async () => {
+    const service = buildService({
+      openFdaImplementation: () => null,
+      pubMedImplementation: () => {
+        throw new Error("PubMed unavailable");
+      },
+    });
+
+    const result = await service.checkDrugInteractions(
+      ["warfarin", "ibuprofen"],
+      "92222222-2222-4222-8222-222222222222",
+    );
+
+    expect(result.interactions.length).toBeGreaterThan(0);
+    expect(result.llmSynthesis?.evidenceSummaries).toBeUndefined();
   });
 
   it("builds concept context from RxCUI properties when pre-resolved data is not provided", async () => {
