@@ -26,6 +26,11 @@ import {
   explainMedicationSafetyOutputSchema,
   executeExplainMedicationSafety,
 } from "./explainMedicationSafety";
+import {
+  calculatePatientSafetyScoreInputSchema,
+  calculatePatientSafetyScoreOutputSchema,
+  executeCalculatePatientSafetyScore,
+} from "./calculatePatientSafetyScore";
 import { OpenFdaClient } from "../clients/openFdaClient";
 import { PubMedClient } from "../clients/pubMedClient";
 import { RxNormClient } from "../clients/rxNormClient";
@@ -43,6 +48,7 @@ import { PolypharmacyService } from "../services/polypharmacyService";
 import { ContraindicationService } from "../services/contraindicationService";
 import { SaferAlternativesService } from "../services/saferAlternativesService";
 import { MedicationSafetyExplanationService } from "../services/medicationSafetyExplanationService";
+import { PatientSafetyScoreService } from "../services/patientSafetyScoreService";
 import { SharpContextFhirService } from "../services/sharpContextFhirService";
 
 /**
@@ -173,6 +179,35 @@ export function registerTools(server: McpServer, logger: Logger): void {
   const medicationExplanationService = new MedicationSafetyExplanationService(
     logger.child({ component: "medication-explanation-service" }),
     medicationExplanationSynthesisService,
+  );
+
+  const patientSafetyScoreService = new PatientSafetyScoreService(
+    logger.child({ component: "patient-safety-score-service" }),
+    interactionService,
+  );
+
+  server.registerTool(
+    "calculate_patient_safety_score",
+    {
+      title: "Calculate Patient Safety Score",
+      description:
+        "Calculates a 0-100 medication safety score using interaction severity, polypharmacy burden, Beers-style older-adult risks, and duplicate therapeutic classes. SHARP-compliant context propagation is supported via sharp_context.",
+      inputSchema: calculatePatientSafetyScoreInputSchema,
+      outputSchema: calculatePatientSafetyScoreOutputSchema,
+      annotations: {
+        title: "Medication Safety",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) =>
+      executeCalculatePatientSafetyScore(args, {
+        service: patientSafetyScoreService,
+        logger,
+        sharpContextService,
+      }),
   );
 
   server.registerTool(

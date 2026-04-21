@@ -152,6 +152,42 @@ export interface AnalyzePolypharmacyResult {
   generatedAt: string;
 }
 
+export interface SafetyScoreDeduction {
+  category: string;
+  points: number;
+  rationale: string;
+}
+
+export interface SafetyScoreImprovementOpportunity {
+  title: string;
+  action: string;
+  expectedPointsGain: number;
+}
+
+export interface PatientSafetyScoreResult {
+  requestId: string;
+  source: "rules-interactions";
+  analysisProvider: "groq" | "gemini" | "rule-based";
+  riskLevel: RiskLevel;
+  score: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  medicationCount: number;
+  deductionTotal: number;
+  deductions: SafetyScoreDeduction[];
+  interactionSummary: {
+    contraindicated: number;
+    major: number;
+    moderate: number;
+    minor: number;
+  };
+  beersFlags: BeersCriteriaFlag[];
+  duplicateTherapeuticClasses: DuplicateTherapeuticClassFlag[];
+  improvementOpportunities: SafetyScoreImprovementOpportunity[];
+  potentialOptimizedScore: number;
+  summary: string;
+  generatedAt: string;
+}
+
 export type ContraindicationSeverity = "moderate" | "major" | "contraindicated";
 
 export type ContraindicationTrigger =
