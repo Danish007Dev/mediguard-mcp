@@ -1,8 +1,8 @@
-# MediGuard MCP Demo + Test Playbook (After phase 5 completion)
+# MediGuard MCP Demo + Test Playbook (After Phase 6 Feature 2)
 
 This guide lets you do two things:
-1. Run a real end-to-end product demo of all 5 tools.
-2. Verify everything built through Phase 5 (validation, fallback, observability, and reliability).
+1. Run a real end-to-end product demo of all 6 tools.
+2. Verify everything built through Phase 6 Feature 2 (validation, fallback, observability, reliability, and dashboard-ready scoring output).
 
 ## 1) Prerequisites
 
@@ -27,7 +27,7 @@ Open a second terminal in the same folder:
 
 npx @modelcontextprotocol/inspector node dist/server.js
 
-In MCP Inspector, connect to the server process and use the 5 tools below.
+In MCP Inspector, connect to the server process and use the 6 tools below.
 
 ### 2.1 How to fill fields in MCP Inspector
 
@@ -244,6 +244,33 @@ Use this when the Inspector shows separate fields on the left.
 
 {}
 
+### Tool 6: calculate_patient_safety_score
+
+- patient_age:
+
+82
+
+- patient_conditions:
+
+[
+  "atrial fibrillation",
+  "chronic kidney disease",
+  "fall risk"
+]
+
+- current_medications:
+
+[
+  "warfarin",
+  "ibuprofen",
+  "diphenhydramine",
+  "diazepam",
+  "aspirin"
+]
+
+- sharp_context:
+  - leave empty, or use section 2.2 object
+
 ## 2.4 How to read your first output (what it means)
 
 If you see text like:
@@ -259,7 +286,7 @@ Your takeaway is:
 3. The system is currently using deterministic fallback synthesis (not Groq/Gemini), which is expected if LLM keys are missing, unavailable, or fallback was selected.
 4. Patient context was applied if the summary includes age/conditions/renal context.
 
-## 3) Live Demo Script (One Pass, 5 Tools)
+## 3) Live Demo Script (One Pass, 6 Tools)
 
 Use these payloads exactly in Inspector.
 
@@ -409,6 +436,38 @@ Expected signal:
 - keyPoints and followUpQuestions populated
 - llmTrace and llmTelemetry present
 
+### F) calculate_patient_safety_score
+
+What to enter in each field:
+
+- patient_age (optional but recommended): integer age to activate older-adult risk scoring.
+- patient_conditions (optional): known conditions that may influence interaction context.
+- current_medications (required unless using sharp_context): active medication list.
+- sharp_context (optional): hydration from FHIR if direct med list is unavailable.
+
+Input:
+{
+  "patient_age": 82,
+  "patient_conditions": ["atrial fibrillation", "chronic kidney disease", "fall risk"],
+  "current_medications": [
+    "warfarin",
+    "ibuprofen",
+    "diphenhydramine",
+    "diazepam",
+    "aspirin"
+  ]
+}
+
+Expected signal:
+- score, grade, riskLevel, and potentialOptimizedScore are present
+- deductions and interactionSummary are populated
+- dashboardArtifact is present with these panels:
+  - scoreCard
+  - severityChart
+  - deductionBreakdown
+  - opportunityQueue
+  - flagsPanel
+
 ## 3.1 Copy-paste minimal inputs (fastest path)
 
 Use these if you want the smallest working payload per tool.
@@ -441,6 +500,12 @@ explain_medication_safety
   "language": "en",
   "medication": "warfarin",
   "risk_level": "high"
+}
+
+calculate_patient_safety_score
+{
+  "patient_age": 79,
+  "current_medications": ["warfarin", "ibuprofen", "diphenhydramine"]
 }
 
 ## 4) Full Engineering Test Guide (Everything Built So Far)
@@ -527,11 +592,13 @@ npm run test:integration
 
 Mark complete when all are true:
 
-- [ ] All 5 tools produce structured responses in Inspector
+- [ ] All 6 tools produce structured responses in Inspector
 - [ ] At least one high-risk scenario is correctly flagged
 - [ ] At least one contraindication scenario is correctly flagged
 - [ ] Safer alternatives are ranked with rationale
 - [ ] Explanation tool returns patient-readable output
+- [ ] Safety score tool returns score, grade, risk, deductions, and potentialOptimizedScore
+- [ ] dashboardArtifact panels are present (scoreCard, severityChart, deductionBreakdown, opportunityQueue, flagsPanel)
 - [ ] llmTrace and llmTelemetry appear in synthesis-enabled outputs
 - [ ] validate command passes end-to-end
 
