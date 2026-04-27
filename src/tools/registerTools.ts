@@ -204,7 +204,11 @@ export function registerTools(server: McpServer, logger: Logger): void {
     patientSafetyScoreService,
   );
 
-  const decisionTraceService = new DecisionTraceService();
+  const decisionTraceService = new DecisionTraceService({
+    maxRecords: env.DECISION_TRACE_MAX_RECORDS,
+    maxAgeMs: env.DECISION_TRACE_MAX_AGE_MS,
+    archivePath: env.DECISION_TRACE_ARCHIVE_PATH,
+  });
 
   server.registerTool(
     "calculate_patient_safety_score",

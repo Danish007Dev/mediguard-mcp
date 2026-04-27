@@ -1,4 +1,7 @@
 import { DecisionTraceService } from "../../src/services/decisionTraceService";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("DecisionTraceService", () => {
   it("stores and completes a trace with ordered steps", () => {
@@ -130,5 +133,116 @@ describe("DecisionTraceService", () => {
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0].requestId).toBe("77777777-7777-4777-8777-777777777777");
+  });
+
+  it("redacts PHI-like fields in stored summaries and step details", () => {
+    const service = new DecisionTraceService();
+    const requestId = "88888888-8888-4888-8888-888888888888";
+
+    service.startTrace({
+      requestId,
+      toolName: "check_drug_interactions",
+      inputSummary: {
+        patient_id: "patient-123",
+        displayName: "Jane Doe",
+        contact: "jane@example.com",
+        medicationCount: 2,
+      },
+    });
+
+    const startedAt = Date.now();
+    service.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt,
+      finishedAt: startedAt + 5,
+      details: {
+        auth_token: "secret-token",
+        nursePhone: "555-123-4567",
+      },
+    });
+
+    service.completeTrace({
+      requestId,
+      outputSummary: {
+        riskLevel: "high",
+        patientIdentifier: "abc-123",
+      },
+    });
+
+    const trace = service.getTrace(requestId);
+
+    expect(trace).toBeDefined();
+    expect(trace?.inputSummary.patient_id).toBe("[REDACTED]");
+    expect(trace?.inputSummary.displayName).toBe("[REDACTED]");
+    expect(trace?.inputSummary.contact).toBe("[REDACTED]");
+    expect(trace?.steps[0]?.details).toMatchObject({
+      auth_token: "[REDACTED]",
+      nursePhone: "[REDACTED]",
+    });
+    expect(trace?.outputSummary).toMatchObject({
+      riskLevel: "high",
+      patientIdentifier: "[REDACTED]",
+    });
+  });
+
+  it("writes completed traces to archive path when configured", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "mediguard-trace-"));
+    const archivePath = join(tempDir, "decision-trace.ndjson");
+    const service = new DecisionTraceService({ archivePath });
+    const requestId = "99999999-9999-4999-8999-999999999999";
+
+    service.startTrace({
+      requestId,
+      toolName: "simulate_medication_change",
+      inputSummary: { action: "replace" },
+    });
+
+    service.completeTrace({
+      requestId,
+      outputSummary: { recommendation: "safer" },
+    });
+
+    const archived = readFileSync(archivePath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { requestId: string });
+
+    expect(archived).toHaveLength(1);
+    expect(archived[0]?.requestId).toBe(requestId);
+  });
+
+  it("evicts traces older than configured maxAgeMs", () => {
+    let fakeNow = 1_700_000_000_000;
+
+    const service = new DecisionTraceService({
+      maxAgeMs: 50,
+      nowProvider: () => fakeNow,
+    });
+
+    const firstRequestId = "10101010-1010-4010-8010-101010101010";
+    const secondRequestId = "20202020-2020-4020-8020-202020202020";
+
+    service.startTrace({
+      requestId: firstRequestId,
+      toolName: "check_drug_interactions",
+      inputSummary: {},
+    });
+    service.completeTrace({
+      requestId: firstRequestId,
+      outputSummary: { riskLevel: "medium" },
+    });
+
+    fakeNow += 60;
+
+    service.startTrace({
+      requestId: secondRequestId,
+      toolName: "check_drug_interactions",
+      inputSummary: {},
+    });
+
+    expect(service.getTrace(firstRequestId)).toBeUndefined();
+    expect(service.getTrace(secondRequestId)).toBeDefined();
   });
 });

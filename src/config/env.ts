@@ -58,6 +58,9 @@ const envSchema = z.object({
   FHIR_DEFAULT_TOKEN_ENDPOINT: optionalString,
   API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   DRUG_CACHE_TTL: z.coerce.number().int().positive().default(86400),
+  DECISION_TRACE_MAX_RECORDS: z.coerce.number().int().positive().default(1000),
+  DECISION_TRACE_MAX_AGE_MS: z.coerce.number().int().positive().default(86400000),
+  DECISION_TRACE_ARCHIVE_PATH: optionalString,
 });
 
 const parsed = envSchema.safeParse(process.env);

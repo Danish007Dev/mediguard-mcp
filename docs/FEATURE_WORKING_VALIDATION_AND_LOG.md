@@ -147,7 +147,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 ## Feature 4: Explainable AI Dashboard
 
 ### Current implementation status
-Status: In progress (vertical slice complete).
+Status: In progress (hardening slice complete).
 
 Implemented in:
 - `src/services/decisionTraceService.ts`
@@ -160,6 +160,12 @@ Implemented in:
 - `src/tools/explainMedicationSafety.ts`
 - `src/tools/calculatePatientSafetyScore.ts`
 - `src/tools/simulateWhatIfMedicationChange.ts`
+
+Hardening additions:
+- PHI-safe redaction in trace summaries and step details.
+- Configurable in-memory retention policy (`DECISION_TRACE_MAX_RECORDS`, `DECISION_TRACE_MAX_AGE_MS`).
+- Optional append-only archive persistence (`DECISION_TRACE_ARCHIVE_PATH`).
+- High-volume retention and retrieval-latency safety baseline test.
 
 ### How to see Feature 4 working
 1. Run any clinical tool call (for example `check_drug_interactions`) and copy the returned `requestId`.
@@ -175,6 +181,16 @@ Implemented in:
 - `toolName`, `status`, `startedAt`, `finishedAt`
 - `inputSummary` and `outputSummary`
 - `steps[]` with `name`, `status`, `durationMs`, and `details`
+
+### Feature 4 quick validation command
+
+```bash
+npm run validate:feature4
+```
+
+Includes:
+- Feature 4 unit suites for trace service/tools/instrumented tool paths.
+- `tests/safety/decisionTrace.performance.safety.test.ts` high-volume retention and p95 retrieval checks.
 
 ## Execution log
 
@@ -202,6 +218,8 @@ Implemented in:
 - Completed Feature 4 vertical slice: added in-memory decision trace store, retrieval MCP tool (`get_decision_trace`), and trace capture instrumentation across all 7 clinical tools.
 - Added Feature 4 unit coverage for trace lifecycle, retrieval behavior, and tool-level trace write assertions.
 - Expanded demo guidance to 8 tools, including explicit decision trace retrieval workflow.
+- Hardened Feature 4 with PHI redaction, configurable retention/TTL policy, optional archive persistence, and a dedicated safety performance baseline.
+- Added repeatable validation command: `npm run validate:feature4`.
 
 ## Manual validation sign-off section
 
