@@ -380,6 +380,10 @@ OPTIMIZED SCORE: 93/100 ✅ (Grade: A, Risk: LOW)
 **Implementation Time**: 6 hours  
 **Judging Criteria**: ✅ AI Factor, ✅✅ Potential Impact, ✅ Feasibility
 
+**Current status (Apr 27, 2026)**:
+- In progress: backend `simulate_medication_change` tool path implemented with before/after safety-score deltas and risk-change summaries.
+- Pending: scenario library expansion, performance hardening (<2s target), and clinical validation batch against pharmacist predictions.
+
 **Why It Wins**:
 - **Parth**: Technical innovation, real-time AI reasoning
 - **Joshua**: User experience, clinical decision support

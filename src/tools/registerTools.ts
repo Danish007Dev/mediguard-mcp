@@ -31,6 +31,11 @@ import {
   calculatePatientSafetyScoreOutputSchema,
   executeCalculatePatientSafetyScore,
 } from "./calculatePatientSafetyScore";
+import {
+  simulateWhatIfMedicationChangeInputSchema,
+  simulateWhatIfMedicationChangeOutputSchema,
+  executeSimulateWhatIfMedicationChange,
+} from "./simulateWhatIfMedicationChange";
 import { OpenFdaClient } from "../clients/openFdaClient";
 import { PubMedClient } from "../clients/pubMedClient";
 import { RxNormClient } from "../clients/rxNormClient";
@@ -49,6 +54,7 @@ import { ContraindicationService } from "../services/contraindicationService";
 import { SaferAlternativesService } from "../services/saferAlternativesService";
 import { MedicationSafetyExplanationService } from "../services/medicationSafetyExplanationService";
 import { PatientSafetyScoreService } from "../services/patientSafetyScoreService";
+import { WhatIfSimulationService } from "../services/whatIfSimulationService";
 import { SharpContextFhirService } from "../services/sharpContextFhirService";
 
 /**
@@ -186,6 +192,12 @@ export function registerTools(server: McpServer, logger: Logger): void {
     interactionService,
   );
 
+  const whatIfSimulationService = new WhatIfSimulationService(
+    logger.child({ component: "what-if-simulation-service" }),
+    interactionService,
+    patientSafetyScoreService,
+  );
+
   server.registerTool(
     "calculate_patient_safety_score",
     {
@@ -205,6 +217,30 @@ export function registerTools(server: McpServer, logger: Logger): void {
     async (args) =>
       executeCalculatePatientSafetyScore(args, {
         service: patientSafetyScoreService,
+        logger,
+        sharpContextService,
+      }),
+  );
+
+  server.registerTool(
+    "simulate_medication_change",
+    {
+      title: "Simulate Medication Change",
+      description:
+        "Simulates add/remove/replace medication scenarios and compares safety score and interaction deltas before vs after the proposed change. SHARP-compliant context propagation is supported via sharp_context.",
+      inputSchema: simulateWhatIfMedicationChangeInputSchema,
+      outputSchema: simulateWhatIfMedicationChangeOutputSchema,
+      annotations: {
+        title: "Medication Safety",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) =>
+      executeSimulateWhatIfMedicationChange(args, {
+        service: whatIfSimulationService,
         logger,
         sharpContextService,
       }),

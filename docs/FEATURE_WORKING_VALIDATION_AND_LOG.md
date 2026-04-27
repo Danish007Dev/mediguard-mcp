@@ -139,7 +139,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 |---|---|---|---|---|---|
 | F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | Closed (engineering scope complete; manual clinical checks pending) |
 | F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | `calculate_patient_safety_score` tool + dashboard-ready scoring payload | Algorithm unit tests + scenario tests + performance <100ms | In progress (engineering + demo payload complete; manual chart/pharmacist validation pending) |
-| F3 | What-If Simulator | Compare risk before/after medication changes | New simulation tool output with risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | Planned |
+| F3 | What-If Simulator | Compare risk before/after medication changes | `simulate_medication_change` tool output with before/after snapshots and risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | In progress (backend service + MCP tool + baseline unit tests implemented) |
 | F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | Decision trace capture and dashboard artifact | Trace completeness tests + perf tests + PHI safety checks | Planned |
 | F5 | Real-Time Multi-Agent Demo | Show cross-agent orchestration for medication safety | Demo agent workflow with MCP calls | End-to-end scripted scenario tests | Planned |
 | F6 | Epic Workflow Integration Mockup | Demonstrate EHR-embedded safety workflow | Mock workflow artifacts + integration narrative | UX walkthrough tests + scenario validation | Planned |
@@ -163,6 +163,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 - Updated demo test playbook to a 6-tool flow including `calculate_patient_safety_score` with dashboardArtifact verification steps.
 - Added explicit Feature 2 roadmap checks for dashboardArtifact contract validation and demo readiness.
 - Added `npm run generate:feature2-sheet` automation to create `docs/clinical/feature2_review_sheet.csv` with 100 chart IDs and 25/35/30/10 risk-bucket distribution for manual clinical adjudication.
+- Began Feature 3: implemented `simulate_medication_change` backend flow (service + MCP tool registration + initial test coverage) to compare before/after safety score and interaction deltas.
 
 ## Manual validation sign-off section
 

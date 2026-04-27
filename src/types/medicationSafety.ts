@@ -323,3 +323,41 @@ export interface ExplainMedicationSafetyResult {
   llmTelemetry?: InteractionLlmTelemetry;
   generatedAt: string;
 }
+
+export type WhatIfChangeAction = "add" | "remove" | "replace";
+
+export interface WhatIfProposedChange {
+  action: WhatIfChangeAction;
+  drug: string;
+  replacementDrug?: string;
+}
+
+export interface WhatIfScenarioSnapshot {
+  medications: string[];
+  score: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  riskLevel: RiskLevel;
+  interactionCount: number;
+}
+
+export interface WhatIfSimulationDelta {
+  scoreDelta: number;
+  interactionDelta: number;
+  gradeChanged: boolean;
+  riskLevelChanged: boolean;
+}
+
+export interface WhatIfSimulationResult {
+  requestId: string;
+  source: "rules-what-if";
+  analysisProvider: "groq" | "gemini" | "rule-based";
+  recommendation: "safer" | "riskier" | "equivalent";
+  proposedChange: WhatIfProposedChange;
+  current: WhatIfScenarioSnapshot;
+  proposed: WhatIfScenarioSnapshot;
+  delta: WhatIfSimulationDelta;
+  newRisks: InteractionFinding[];
+  resolvedRisks: InteractionFinding[];
+  explanation: string;
+  generatedAt: string;
+}
