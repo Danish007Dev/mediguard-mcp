@@ -1,0 +1,125 @@
+[
+  {
+    "scenarioId": "F3-SCENARIO-001",
+    "title": "Replace NSAID in anticoagulated patient",
+    "patientAge": 70,
+    "patientConditions": ["atrial fibrillation"],
+    "currentMedications": ["warfarin", "ibuprofen"],
+    "proposedChange": {
+      "action": "replace",
+      "drug": "ibuprofen",
+      "replacement_drug": "acetaminophen"
+    },
+    "expectedRecommendation": "safer"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-002",
+    "title": "Add aspirin to warfarin regimen",
+    "patientAge": 68,
+    "patientConditions": ["atrial fibrillation", "hypertension"],
+    "currentMedications": ["warfarin"],
+    "proposedChange": {
+      "action": "add",
+      "drug": "aspirin"
+    },
+    "expectedRecommendation": "riskier"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-003",
+    "title": "Deprescribe duplicate NSAID",
+    "patientAge": 60,
+    "patientConditions": ["osteoarthritis"],
+    "currentMedications": ["ibuprofen", "naproxen", "lisinopril"],
+    "proposedChange": {
+      "action": "remove",
+      "drug": "naproxen"
+    },
+    "expectedRecommendation": "safer"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-004",
+    "title": "Replace benzodiazepine in elderly patient",
+    "patientAge": 82,
+    "patientConditions": ["falls", "insomnia"],
+    "currentMedications": ["diazepam", "metoprolol"],
+    "proposedChange": {
+      "action": "replace",
+      "drug": "diazepam",
+      "replacement_drug": "melatonin"
+    },
+    "expectedRecommendation": "safer"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-005",
+    "title": "Add second sedative-hypnotic",
+    "patientAge": 77,
+    "patientConditions": ["cognitive impairment"],
+    "currentMedications": ["zolpidem"],
+    "proposedChange": {
+      "action": "add",
+      "drug": "lorazepam"
+    },
+    "expectedRecommendation": "riskier"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-006",
+    "title": "Replace sulfonylurea in older adult",
+    "patientAge": 74,
+    "patientConditions": ["type 2 diabetes"],
+    "currentMedications": ["glyburide", "losartan"],
+    "proposedChange": {
+      "action": "replace",
+      "drug": "glyburide",
+      "replacement_drug": "metformin"
+    },
+    "expectedRecommendation": "safer"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-007",
+    "title": "Add NSAID in CKD and heart failure",
+    "patientAge": 73,
+    "patientConditions": ["chronic kidney disease", "heart failure"],
+    "currentMedications": ["furosemide", "lisinopril"],
+    "proposedChange": {
+      "action": "add",
+      "drug": "diclofenac"
+    },
+    "expectedRecommendation": "riskier"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-008",
+    "title": "Remove long-term PPI after reassessment",
+    "patientAge": 58,
+    "patientConditions": ["GERD"],
+    "currentMedications": ["omeprazole", "famotidine"],
+    "proposedChange": {
+      "action": "remove",
+      "drug": "omeprazole"
+    },
+    "expectedRecommendation": "equivalent"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-009",
+    "title": "Replace ACE/ARB overlap",
+    "patientAge": 69,
+    "patientConditions": ["hypertension"],
+    "currentMedications": ["lisinopril", "losartan", "metformin"],
+    "proposedChange": {
+      "action": "remove",
+      "drug": "losartan"
+    },
+    "expectedRecommendation": "safer"
+  },
+  {
+    "scenarioId": "F3-SCENARIO-010",
+    "title": "No-op add (already present medication)",
+    "patientAge": 65,
+    "patientConditions": [],
+    "currentMedications": ["warfarin", "ibuprofen"],
+    "proposedChange": {
+      "action": "add",
+      "drug": "ibuprofen"
+    },
+    "expectedRecommendation": "equivalent"
+  }
+]

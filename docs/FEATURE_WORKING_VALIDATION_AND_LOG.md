@@ -164,6 +164,9 @@ Use this table to track upcoming features, their use, tests, and readiness.
 - Added explicit Feature 2 roadmap checks for dashboardArtifact contract validation and demo readiness.
 - Added `npm run generate:feature2-sheet` automation to create `docs/clinical/feature2_review_sheet.csv` with 100 chart IDs and 25/35/30/10 risk-bucket distribution for manual clinical adjudication.
 - Began Feature 3: implemented `simulate_medication_change` backend flow (service + MCP tool registration + initial test coverage) to compare before/after safety score and interaction deltas.
+- Hardened Feature 3 baseline with deterministic delta/edge-case unit tests and a safety-performance baseline (`tests/safety/whatIfSimulation.performance.safety.test.ts`).
+- Added Feature 3 scenario pack artifact at `docs/clinical/feature3_demo_scenarios.json` (10 demo-ready add/remove/replace cases).
+- Added repeatable validation command: `npm run validate:feature3`.
 
 ## Manual validation sign-off section
 

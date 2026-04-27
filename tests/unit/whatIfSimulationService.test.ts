@@ -252,4 +252,125 @@ describe("WhatIfSimulationService", () => {
       code: "VALIDATION_ERROR",
     });
   });
+
+  it("returns equivalent when add action targets an already present medication", async () => {
+    const interactionService = {
+      checkDrugInteractions: jest.fn().mockResolvedValue(
+        buildInteractionResult({
+          medications: ["warfarin", "ibuprofen"],
+          interactions: [
+            {
+              drugs: ["warfarin", "ibuprofen"],
+              severity: "major",
+              mechanism: "Bleeding",
+              clinicalImpact: "Major bleed risk",
+              recommendations: ["Avoid overlap"],
+              evidence: "label",
+            },
+          ],
+        }),
+      ),
+    };
+
+    const patientSafetyScoreService = {
+      calculateSafetyScore: jest.fn().mockResolvedValue(
+        buildScoreResult({
+          score: 75,
+          grade: "B",
+          riskLevel: "medium",
+          medicationCount: 2,
+        }),
+      ),
+    };
+
+    const service = new WhatIfSimulationService(
+      logger,
+      interactionService as never,
+      patientSafetyScoreService as never,
+    );
+
+    const result = await service.simulate(
+      {
+        patientAge: 67,
+        patientConditions: [],
+        currentMedications: ["warfarin", "ibuprofen"],
+        proposedChange: {
+          action: "add",
+          drug: "ibuprofen",
+        },
+      },
+      "66666666-6666-4666-8666-666666666666",
+    );
+
+    expect(result.recommendation).toBe("equivalent");
+    expect(result.delta.scoreDelta).toBe(0);
+    expect(result.delta.interactionDelta).toBe(0);
+  });
+
+  it("throws validation error when remove action targets unknown medication", async () => {
+    const interactionService = {
+      checkDrugInteractions: jest.fn(),
+    };
+
+    const patientSafetyScoreService = {
+      calculateSafetyScore: jest.fn(),
+    };
+
+    const service = new WhatIfSimulationService(
+      logger,
+      interactionService as never,
+      patientSafetyScoreService as never,
+    );
+
+    await expect(
+      service.simulate(
+        {
+          patientAge: 65,
+          patientConditions: [],
+          currentMedications: ["warfarin"],
+          proposedChange: {
+            action: "remove",
+            drug: "ibuprofen",
+          },
+        },
+        "77777777-7777-4777-8777-777777777777",
+      ),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+
+  it("throws validation error when replace action uses identical source and replacement", async () => {
+    const interactionService = {
+      checkDrugInteractions: jest.fn(),
+    };
+
+    const patientSafetyScoreService = {
+      calculateSafetyScore: jest.fn(),
+    };
+
+    const service = new WhatIfSimulationService(
+      logger,
+      interactionService as never,
+      patientSafetyScoreService as never,
+    );
+
+    await expect(
+      service.simulate(
+        {
+          patientAge: 65,
+          patientConditions: [],
+          currentMedications: ["warfarin"],
+          proposedChange: {
+            action: "replace",
+            drug: "warfarin",
+            replacementDrug: "warfarin",
+          },
+        },
+        "88888888-8888-4888-8888-888888888888",
+      ),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
 });

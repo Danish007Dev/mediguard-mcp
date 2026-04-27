@@ -17,6 +17,7 @@
     "test:coverage": "jest --coverage",
     "validate:feature1": "node scripts/validateFeature1PubMed.mjs",
     "generate:feature2-sheet": "node scripts/generateFeature2ReviewSheet.mjs",
+    "validate:feature3": "npm run test:unit -- whatIfSimulation simulateWhatIfMedicationChange && npx jest tests/safety/whatIfSimulation.performance.safety.test.ts",
     "lint": "eslint src tests --ext .ts",
     "lint:fix": "eslint src tests --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",

@@ -576,6 +576,16 @@ simulate_medication_change
   }
 }
 
+## 3.2 Feature 3 Scenario Pack
+
+Use the preloaded What-If examples in:
+- `docs/clinical/feature3_demo_scenarios.json`
+
+Each scenario includes:
+- baseline medications
+- proposed change (`add` / `remove` / `replace`)
+- expected recommendation (`safer` / `riskier` / `equivalent`)
+
 ## 4) Full Engineering Test Guide (Everything Built So Far)
 
 ### A) Quality gates
@@ -604,6 +614,12 @@ Purpose:
 - unit: core rules, synthesis, schemas
 - integration: FHIR and end-to-end flows
 - safety: HIPAA/compliance/performance and resilience checks
+
+Feature-specific quick validation:
+
+```bash
+npm run validate:feature3
+```
 
 ### C) Fallback behavior test (Phase 5 reliability)
 
