@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppError, toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { AnalyzePolypharmacyResult } from "../types/medicationSafety";
 
@@ -129,6 +130,7 @@ interface AnalyzePolypharmacyDependencies {
   service: AnalyzePolypharmacyService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -202,7 +204,19 @@ export async function executeAnalyzePolypharmacy(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "analyze_polypharmacy",
+    inputSummary: {
+      medicationCount: args.current_medications.length,
+      patientConditionCount: args.patient_conditions.length,
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientContext: Boolean(args.patient_context),
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -228,6 +242,20 @@ export async function executeAnalyzePolypharmacy(
       ...hydratedConditions,
     ]);
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedConditionCount: hydratedConditions.length,
+        finalMedicationCount: currentMedications.length,
+        finalConditionCount: patientConditions.length,
+      },
+    });
+
     if (currentMedications.length === 0) {
       throw new AppError(
         "Provide at least one current medication, or supply sharp_context for FHIR hydration.",
@@ -248,6 +276,7 @@ export async function executeAnalyzePolypharmacy(
       hydratedConditionCount: hydratedConditions.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.analyzePolypharmacy(
       {
         patientAge: args.patient_age,
@@ -257,13 +286,49 @@ export async function executeAnalyzePolypharmacy(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "polypharmacy_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        analysisProvider: result.analysisProvider,
+        source: result.source,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        riskLevel: validatedResult.riskLevel,
+        beersFlags: validatedResult.beersFlags.length,
+        duplicateClasses: validatedResult.duplicateTherapeuticClasses.length,
+      },
+    });
 
     toolLogger.info("Polypharmacy analysis completed", {
       riskLevel: validatedResult.riskLevel,
       beersFlags: validatedResult.beersFlags.length,
       duplicateClasses: validatedResult.duplicateTherapeuticClasses.length,
       provider: validatedResult.analysisProvider,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        riskLevel: validatedResult.riskLevel,
+        medicationCount: validatedResult.medicationCount,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -277,6 +342,12 @@ export async function executeAnalyzePolypharmacy(
     };
   } catch (error) {
     const appError = toAppError(error, "Unable to analyze polypharmacy risk.");
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Polypharmacy analysis failed", {
       code: appError.code,

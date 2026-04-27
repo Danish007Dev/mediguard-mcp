@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { CheckContraindicationsResult } from "../types/medicationSafety";
@@ -137,6 +138,7 @@ interface CheckContraindicationsDependencies {
   service: CheckContraindicationsService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -199,7 +201,21 @@ export async function executeCheckContraindications(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "check_contraindications",
+    inputSummary: {
+      proposedMedication: args.proposed_medication,
+      allergyCount: args.patient_allergies.length,
+      conditionCount: args.patient_conditions.length,
+      hasLabs: Boolean(args.lab_values),
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientContext: Boolean(args.patient_context),
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -223,6 +239,20 @@ export async function executeCheckContraindications(
       ...hydratedConditions,
     ]);
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedAllergyCount: hydratedAllergies.length,
+        hydratedConditionCount: hydratedConditions.length,
+        finalAllergyCount: patientAllergies.length,
+        finalConditionCount: patientConditions.length,
+      },
+    });
+
     if (sharpContext && dependencies.sharpContextService) {
       dependencies.sharpContextService.propagateContext(sharpContext);
     }
@@ -237,6 +267,7 @@ export async function executeCheckContraindications(
       hydratedConditionCount: hydratedConditions.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.checkContraindications(
       {
         proposedMedication: args.proposed_medication,
@@ -247,13 +278,51 @@ export async function executeCheckContraindications(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "contraindication_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        source: result.source,
+        analysisProvider: result.analysisProvider,
+        contraindicated: result.contraindicated,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        riskLevel: validatedResult.riskLevel,
+        contraindicated: validatedResult.contraindicated,
+        findingCount: validatedResult.contraindications.length,
+      },
+    });
 
     toolLogger.info("Contraindication check completed", {
       riskLevel: validatedResult.riskLevel,
       contraindicated: validatedResult.contraindicated,
       findingCount: validatedResult.contraindications.length,
       provider: validatedResult.analysisProvider,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        riskLevel: validatedResult.riskLevel,
+        contraindicated: validatedResult.contraindicated,
+        findingCount: validatedResult.contraindications.length,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -270,6 +339,12 @@ export async function executeCheckContraindications(
       error,
       "Unable to evaluate medication contraindications.",
     );
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Contraindication check failed", {
       code: appError.code,

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppError, toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type {
   PatientSafetyDashboardArtifact,
@@ -159,6 +160,7 @@ interface CalculatePatientSafetyScoreDependencies {
   service: PatientSafetyScoreService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -262,7 +264,19 @@ export async function executeCalculatePatientSafetyScore(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "calculate_patient_safety_score",
+    inputSummary: {
+      medicationCount: args.current_medications.length,
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientAge: typeof args.patient_age === "number",
+      patientConditionCount: args.patient_conditions.length,
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -291,6 +305,20 @@ export async function executeCalculatePatientSafetyScore(
       ...hydratedConditions,
     ]);
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedConditionCount: hydratedConditions.length,
+        finalMedicationCount: currentMedications.length,
+        finalConditionCount: patientConditions.length,
+      },
+    });
+
     if (currentMedications.length === 0) {
       throw new AppError(
         "Provide at least one current medication, or supply sharp_context for FHIR hydration.",
@@ -310,6 +338,7 @@ export async function executeCalculatePatientSafetyScore(
       hydratedConditionCount: hydratedConditions.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.calculateSafetyScore(
       {
         patientAge: args.patient_age,
@@ -319,15 +348,52 @@ export async function executeCalculatePatientSafetyScore(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "safety_score_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        source: result.source,
+        analysisProvider: result.analysisProvider,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse({
       ...result,
       dashboardArtifact: buildDashboardArtifact(result),
+    });
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        score: validatedResult.score,
+        grade: validatedResult.grade,
+        riskLevel: validatedResult.riskLevel,
+      },
     });
 
     toolLogger.info("Patient safety score calculation completed", {
       score: validatedResult.score,
       grade: validatedResult.grade,
       riskLevel: validatedResult.riskLevel,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        score: validatedResult.score,
+        grade: validatedResult.grade,
+        riskLevel: validatedResult.riskLevel,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -344,6 +410,12 @@ export async function executeCalculatePatientSafetyScore(
       error,
       "Unable to calculate patient safety score.",
     );
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Patient safety score calculation failed", {
       code: appError.code,

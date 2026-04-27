@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppError, toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import type { DrugInteractionService } from "../services/drugInteractionService";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { CheckDrugInteractionsResult } from "../types/medicationSafety";
@@ -168,6 +169,7 @@ interface CheckDrugInteractionsDependencies {
   service: DrugInteractionService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -230,7 +232,18 @@ export async function executeCheckDrugInteractions(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "check_drug_interactions",
+    inputSummary: {
+      medicationCount: args.medications.length,
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientContext: Boolean(args.patient_context),
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -248,6 +261,19 @@ export async function executeCheckDrugInteractions(
             sharpContext,
           )) ?? []
         : [];
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedConditionCount: hydratedConditions.length,
+        usedSharpContext: Boolean(sharpContext),
+      },
+    });
 
     const medications = asUnique([...args.medications, ...hydratedMedications]);
 
@@ -288,16 +314,53 @@ export async function executeCheckDrugInteractions(
       hasPatientContext: Boolean(patientContext),
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.checkDrugInteractions(
       medications,
       requestId,
       patientContext,
     );
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "interaction_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        analysisProvider: result.analysisProvider,
+        source: result.source,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        interactionCount: validatedResult.interactions.length,
+        riskLevel: validatedResult.riskLevel,
+      },
+    });
 
     toolLogger.info("Medication interaction check completed", {
       interactionCount: validatedResult.interactions.length,
       riskLevel: validatedResult.riskLevel,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        riskLevel: validatedResult.riskLevel,
+        interactionCount: validatedResult.interactions.length,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -314,6 +377,12 @@ export async function executeCheckDrugInteractions(
       error,
       "Unable to evaluate medication interactions.",
     );
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Medication interaction check failed", {
       code: appError.code,

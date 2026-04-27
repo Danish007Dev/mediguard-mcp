@@ -36,6 +36,11 @@ import {
   simulateWhatIfMedicationChangeOutputSchema,
   executeSimulateWhatIfMedicationChange,
 } from "./simulateWhatIfMedicationChange";
+import {
+  getDecisionTraceInputSchema,
+  getDecisionTraceOutputSchema,
+  executeGetDecisionTrace,
+} from "./getDecisionTrace";
 import { OpenFdaClient } from "../clients/openFdaClient";
 import { PubMedClient } from "../clients/pubMedClient";
 import { RxNormClient } from "../clients/rxNormClient";
@@ -56,6 +61,7 @@ import { MedicationSafetyExplanationService } from "../services/medicationSafety
 import { PatientSafetyScoreService } from "../services/patientSafetyScoreService";
 import { WhatIfSimulationService } from "../services/whatIfSimulationService";
 import { SharpContextFhirService } from "../services/sharpContextFhirService";
+import { DecisionTraceService } from "../services/decisionTraceService";
 
 /**
  * Wires all MediGuard tool handlers and their service dependencies into the MCP server.
@@ -198,6 +204,8 @@ export function registerTools(server: McpServer, logger: Logger): void {
     patientSafetyScoreService,
   );
 
+  const decisionTraceService = new DecisionTraceService();
+
   server.registerTool(
     "calculate_patient_safety_score",
     {
@@ -219,6 +227,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: patientSafetyScoreService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 
@@ -243,6 +252,30 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: whatIfSimulationService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
+      }),
+  );
+
+  server.registerTool(
+    "get_decision_trace",
+    {
+      title: "Get Decision Trace",
+      description:
+        "Retrieves recent decision traces or a specific request trace for explainability and debugging.",
+      inputSchema: getDecisionTraceInputSchema,
+      outputSchema: getDecisionTraceOutputSchema,
+      annotations: {
+        title: "Medication Safety",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) =>
+      executeGetDecisionTrace(args, {
+        traceService: decisionTraceService,
+        logger,
       }),
   );
 
@@ -267,6 +300,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: interactionService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 
@@ -291,6 +325,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: polypharmacyService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 
@@ -315,6 +350,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: contraindicationService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 
@@ -339,6 +375,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: saferAlternativesService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 
@@ -363,6 +400,7 @@ export function registerTools(server: McpServer, logger: Logger): void {
         service: medicationExplanationService,
         logger,
         sharpContextService,
+        traceService: decisionTraceService,
       }),
   );
 }

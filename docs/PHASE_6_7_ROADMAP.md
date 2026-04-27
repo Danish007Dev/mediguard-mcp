@@ -369,7 +369,7 @@ OPTIMIZED SCORE: 93/100 ✅ (Grade: A, Risk: LOW)
 - [x] Verify dashboardArtifact output contract (scoreCard, severityChart, deductionBreakdown, opportunityQueue, flagsPanel)
 
 **Demo Readiness (Feature 2)**:
-- [x] 6-tool Inspector playbook updated with calculate_patient_safety_score scenario
+- [x] 8-tool Inspector playbook updated with calculate_patient_safety_score, simulate_medication_change, and get_decision_trace scenarios
 - [x] Feature 2 includes UI-ready dashboard payload in structured output
 - [ ] Manual clinical review evidence attached (de-identified chart + pharmacist sign-off)
 
@@ -573,6 +573,11 @@ Or: Discontinue warfarin, start DOAC + Aspirin (predicted score: 88/100)
 **Target Judges**: Piyush (10/10), Parth (8/10), Josh (7/10)  
 **Implementation Time**: 5 hours  
 **Judging Criteria**: ✅✅ AI Factor, ✅ Potential Impact, ✅✅ Feasibility
+
+**Current status (Apr 27, 2026)**:
+- In progress: decision trace vertical slice is implemented with in-memory storage (`DecisionTraceService`) and retrieval (`get_decision_trace`).
+- In progress: trace capture now records step-level events for all 7 clinical analysis tools.
+- Pending: persistent storage policy, PHI-safe retention hardening, and UI/dashboard rendering layer.
 
 **Why It Wins**:
 - **Piyush**: Transparency, clinical validation, BrainX values explainability

@@ -361,3 +361,29 @@ export interface WhatIfSimulationResult {
   explanation: string;
   generatedAt: string;
 }
+
+export interface DecisionTraceStep {
+  name: string;
+  status: "success" | "warning" | "error";
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  details?: Record<string, unknown>;
+}
+
+export interface DecisionTraceError {
+  code: string;
+  message: string;
+}
+
+export interface DecisionTraceRecord {
+  requestId: string;
+  toolName: string;
+  startedAt: string;
+  finishedAt: string;
+  status: "success" | "error";
+  inputSummary: Record<string, unknown>;
+  outputSummary?: Record<string, unknown>;
+  steps: DecisionTraceStep[];
+  error?: DecisionTraceError;
+}

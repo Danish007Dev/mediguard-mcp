@@ -1,5 +1,6 @@
 import { executeCheckDrugInteractions } from "../../src/tools/checkDrugInteractions";
 import { Logger } from "../../src/logging/logger";
+import { DecisionTraceService } from "../../src/services/decisionTraceService";
 import { MockDrugInteractionService } from "../../src/services/mockDrugInteractionService";
 
 describe("check_drug_interactions tool", () => {
@@ -62,5 +63,31 @@ describe("check_drug_interactions tool", () => {
     expect(response.isError).not.toBe(true);
     expect(sharpContextService.resolveMedications).toHaveBeenCalledTimes(1);
     expect(sharpContextService.propagateContext).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes a decision trace for successful interaction checks", async () => {
+    const traceService = new DecisionTraceService();
+
+    const response = await executeCheckDrugInteractions(
+      { medications: ["warfarin", "ibuprofen"] },
+      { logger, service, traceService },
+    );
+
+    expect(response.isError).not.toBe(true);
+
+    const structured = response.structuredContent as {
+      requestId: string;
+      riskLevel: string;
+    };
+
+    const trace = traceService.getTrace(structured.requestId);
+
+    expect(trace).toBeDefined();
+    expect(trace?.toolName).toBe("check_drug_interactions");
+    expect(trace?.status).toBe("success");
+    expect(trace?.steps.length).toBeGreaterThan(0);
+    expect(trace?.outputSummary).toMatchObject({
+      riskLevel: structured.riskLevel,
+    });
   });
 });

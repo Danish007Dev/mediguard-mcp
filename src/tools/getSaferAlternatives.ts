@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { GetSaferAlternativesResult } from "../types/medicationSafety";
@@ -136,6 +137,7 @@ interface GetSaferAlternativesDependencies {
   service: GetSaferAlternativesService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -204,7 +206,23 @@ export async function executeGetSaferAlternatives(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "get_safer_alternatives",
+    inputSummary: {
+      proposedMedication: args.proposed_medication,
+      currentMedicationCount: args.current_medications.length,
+      allergyCount: args.patient_allergies.length,
+      conditionCount: args.patient_conditions.length,
+      formularyCount: args.formulary_preferred.length,
+      maxAlternatives: args.max_alternatives,
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientContext: Boolean(args.patient_context),
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -239,6 +257,22 @@ export async function executeGetSaferAlternatives(
       ...hydratedConditions,
     ]);
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedAllergyCount: hydratedAllergies.length,
+        hydratedConditionCount: hydratedConditions.length,
+        finalMedicationCount: currentMedications.length,
+        finalAllergyCount: patientAllergies.length,
+        finalConditionCount: patientConditions.length,
+      },
+    });
+
     if (sharpContext && dependencies.sharpContextService) {
       dependencies.sharpContextService.propagateContext(sharpContext);
     }
@@ -256,6 +290,7 @@ export async function executeGetSaferAlternatives(
       hydratedConditionCount: hydratedConditions.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.getSaferAlternatives(
       {
         proposedMedication: args.proposed_medication,
@@ -268,12 +303,47 @@ export async function executeGetSaferAlternatives(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "alternatives_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        source: result.source,
+        analysisProvider: result.analysisProvider,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        riskLevel: validatedResult.riskLevel,
+        alternativeCount: validatedResult.alternatives.length,
+      },
+    });
 
     toolLogger.info("Safer alternatives ranking completed", {
       riskLevel: validatedResult.riskLevel,
       alternatives: validatedResult.alternatives.length,
       provider: validatedResult.analysisProvider,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        riskLevel: validatedResult.riskLevel,
+        alternativeCount: validatedResult.alternatives.length,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -290,6 +360,12 @@ export async function executeGetSaferAlternatives(
       error,
       "Unable to rank safer medication alternatives.",
     );
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Safer alternatives ranking failed", {
       code: appError.code,

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AppError, toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { WhatIfSimulationResult } from "../types/medicationSafety";
 
@@ -129,6 +130,7 @@ interface SimulateWhatIfMedicationChangeDependencies {
   service: WhatIfSimulationService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -176,7 +178,20 @@ export async function executeSimulateWhatIfMedicationChange(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "simulate_medication_change",
+    inputSummary: {
+      action: args.proposed_change.action,
+      medicationCount: args.current_medications.length,
+      patientConditionCount: args.patient_conditions.length,
+      hasSharpContext: Boolean(args.sharp_context),
+      isReplaceAction: args.proposed_change.action === "replace",
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -204,6 +219,20 @@ export async function executeSimulateWhatIfMedicationChange(
       ...args.patient_conditions,
       ...hydratedConditions,
     ]);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedConditionCount: hydratedConditions.length,
+        finalMedicationCount: currentMedications.length,
+        finalConditionCount: patientConditions.length,
+      },
+    });
 
     if (currentMedications.length === 0) {
       throw new AppError(
@@ -237,6 +266,7 @@ export async function executeSimulateWhatIfMedicationChange(
       hydratedConditionCount: hydratedConditions.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.simulate(
       {
         patientAge: args.patient_age,
@@ -251,12 +281,48 @@ export async function executeSimulateWhatIfMedicationChange(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "what_if_analysis",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        recommendation: result.recommendation,
+        analysisProvider: result.analysisProvider,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        recommendation: validatedResult.recommendation,
+        scoreDelta: validatedResult.delta.scoreDelta,
+        interactionDelta: validatedResult.delta.interactionDelta,
+      },
+    });
 
     toolLogger.info("What-if simulation completed", {
       recommendation: validatedResult.recommendation,
       scoreDelta: validatedResult.delta.scoreDelta,
       interactionDelta: validatedResult.delta.interactionDelta,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        recommendation: validatedResult.recommendation,
+        scoreDelta: validatedResult.delta.scoreDelta,
+        interactionDelta: validatedResult.delta.interactionDelta,
+      },
     });
 
     return {
@@ -270,6 +336,12 @@ export async function executeSimulateWhatIfMedicationChange(
     };
   } catch (error) {
     const appError = toAppError(error, "Unable to simulate medication change.");
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("What-if simulation failed", {
       code: appError.code,

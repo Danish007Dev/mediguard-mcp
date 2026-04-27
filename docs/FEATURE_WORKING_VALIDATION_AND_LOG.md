@@ -140,9 +140,41 @@ Use this table to track upcoming features, their use, tests, and readiness.
 | F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | Closed (engineering scope complete; manual clinical checks pending) |
 | F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | `calculate_patient_safety_score` tool + dashboard-ready scoring payload | Algorithm unit tests + scenario tests + performance <100ms | In progress (engineering + demo payload complete; manual chart/pharmacist validation pending) |
 | F3 | What-If Simulator | Compare risk before/after medication changes | `simulate_medication_change` tool output with before/after snapshots and risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | In progress (backend service + MCP tool + baseline unit tests implemented) |
-| F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | Decision trace capture and dashboard artifact | Trace completeness tests + perf tests + PHI safety checks | Planned |
+| F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | `get_decision_trace` tool + decision trace capture in all clinical tools | Trace store lifecycle tests + retrieval tests + PHI safety checks | In progress (vertical slice implemented and validated with unit coverage) |
 | F5 | Real-Time Multi-Agent Demo | Show cross-agent orchestration for medication safety | Demo agent workflow with MCP calls | End-to-end scripted scenario tests | Planned |
 | F6 | Epic Workflow Integration Mockup | Demonstrate EHR-embedded safety workflow | Mock workflow artifacts + integration narrative | UX walkthrough tests + scenario validation | Planned |
+
+## Feature 4: Explainable AI Dashboard
+
+### Current implementation status
+Status: In progress (vertical slice complete).
+
+Implemented in:
+- `src/services/decisionTraceService.ts`
+- `src/tools/getDecisionTrace.ts`
+- `src/tools/registerTools.ts`
+- `src/tools/checkDrugInteractions.ts`
+- `src/tools/analyzePolypharmacy.ts`
+- `src/tools/checkContraindications.ts`
+- `src/tools/getSaferAlternatives.ts`
+- `src/tools/explainMedicationSafety.ts`
+- `src/tools/calculatePatientSafetyScore.ts`
+- `src/tools/simulateWhatIfMedicationChange.ts`
+
+### How to see Feature 4 working
+1. Run any clinical tool call (for example `check_drug_interactions`) and copy the returned `requestId`.
+2. Run `get_decision_trace` with:
+
+```json
+{
+  "request_id": "<copied-request-id>"
+}
+```
+
+3. Verify in `structuredContent.traces[0]`:
+- `toolName`, `status`, `startedAt`, `finishedAt`
+- `inputSummary` and `outputSummary`
+- `steps[]` with `name`, `status`, `durationMs`, and `details`
 
 ## Execution log
 
@@ -167,6 +199,9 @@ Use this table to track upcoming features, their use, tests, and readiness.
 - Hardened Feature 3 baseline with deterministic delta/edge-case unit tests and a safety-performance baseline (`tests/safety/whatIfSimulation.performance.safety.test.ts`).
 - Added Feature 3 scenario pack artifact at `docs/clinical/feature3_demo_scenarios.json` (10 demo-ready add/remove/replace cases).
 - Added repeatable validation command: `npm run validate:feature3`.
+- Completed Feature 4 vertical slice: added in-memory decision trace store, retrieval MCP tool (`get_decision_trace`), and trace capture instrumentation across all 7 clinical tools.
+- Added Feature 4 unit coverage for trace lifecycle, retrieval behavior, and tool-level trace write assertions.
+- Expanded demo guidance to 8 tools, including explicit decision trace retrieval workflow.
 
 ## Manual validation sign-off section
 

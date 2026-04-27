@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { toAppError } from "../errors/appError";
 import type { Logger } from "../logging/logger";
+import type { DecisionTraceService } from "../services/decisionTraceService";
 import { sharpContextSchema, toSharpContext } from "../sharp/sharpContext";
 import type { SharpContextDataService } from "../services/sharpContextFhirService";
 import type { ExplainMedicationSafetyResult } from "../types/medicationSafety";
@@ -137,6 +138,7 @@ interface ExplainMedicationSafetyDependencies {
   service: ExplainMedicationSafetyService;
   logger: Logger;
   sharpContextService?: SharpContextDataService;
+  traceService?: DecisionTraceService;
 }
 
 function asUnique(values: string[]): string[] {
@@ -208,7 +210,23 @@ export async function executeExplainMedicationSafety(
     requestId,
   });
 
+  dependencies.traceService?.startTrace({
+    requestId,
+    toolName: "explain_medication_safety",
+    inputSummary: {
+      audience: args.audience,
+      language: args.language,
+      medication: args.medication,
+      riskLevel: args.risk_level,
+      findingCount: args.findings.length,
+      recommendationCount: args.recommendations.length,
+      hasSharpContext: Boolean(args.sharp_context),
+      hasPatientContext: Boolean(args.patient_context),
+    },
+  });
+
   try {
+    const hydrationStepStartedAt = Date.now();
     const sharpContext = args.sharp_context
       ? toSharpContext(args.sharp_context)
       : undefined;
@@ -257,6 +275,20 @@ export async function executeExplainMedicationSafety(
         : []),
     ]);
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "context_hydration",
+      status: "success",
+      startedAt: hydrationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        hydratedMedicationCount: hydratedMedications.length,
+        hydratedAllergyCount: hydratedAllergies.length,
+        finalFindingCount: findings.length,
+        finalRecommendationCount: recommendations.length,
+      },
+    });
+
     if (sharpContext && dependencies.sharpContextService) {
       dependencies.sharpContextService.propagateContext(sharpContext);
     }
@@ -273,6 +305,7 @@ export async function executeExplainMedicationSafety(
       hydratedAllergyCount: hydratedAllergies.length,
     });
 
+    const serviceStepStartedAt = Date.now();
     const result = await dependencies.service.explainMedicationSafety(
       {
         audience: args.audience,
@@ -285,12 +318,48 @@ export async function executeExplainMedicationSafety(
       requestId,
     );
 
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "explanation_generation",
+      status: "success",
+      startedAt: serviceStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        source: result.source,
+        analysisProvider: result.analysisProvider,
+      },
+    });
+
+    const validationStepStartedAt = Date.now();
     const validatedResult = outputObjectSchema.parse(result);
+
+    dependencies.traceService?.addStep({
+      requestId,
+      name: "output_validation",
+      status: "success",
+      startedAt: validationStepStartedAt,
+      finishedAt: Date.now(),
+      details: {
+        audience: validatedResult.audience,
+        riskLevel: validatedResult.riskLevel,
+        keyPointCount: validatedResult.keyPoints.length,
+      },
+    });
 
     toolLogger.info("Medication safety explanation completed", {
       audience: validatedResult.audience,
       riskLevel: validatedResult.riskLevel,
       provider: validatedResult.analysisProvider,
+    });
+
+    dependencies.traceService?.completeTrace({
+      requestId,
+      outputSummary: {
+        status: "success",
+        audience: validatedResult.audience,
+        riskLevel: validatedResult.riskLevel,
+        analysisProvider: validatedResult.analysisProvider,
+      },
     });
 
     return {
@@ -307,6 +376,12 @@ export async function executeExplainMedicationSafety(
       error,
       "Unable to generate medication safety explanation.",
     );
+
+    dependencies.traceService?.failTrace({
+      requestId,
+      code: appError.code,
+      message: appError.message,
+    });
 
     toolLogger.error("Medication safety explanation failed", {
       code: appError.code,

@@ -1,7 +1,7 @@
 # MediGuard MCP Demo + Test Playbook (After Phase 6 Feature 2)
 
 This guide lets you do two things:
-1. Run a real end-to-end product demo of all 7 tools.
+1. Run a real end-to-end product demo of all 8 tools.
 2. Verify everything built through Phase 6 Feature 3 baseline (validation, fallback, observability, reliability, dashboard-ready scoring output, and what-if simulation deltas).
 
 ## 1) Prerequisites
@@ -27,7 +27,7 @@ Open a second terminal in the same folder:
 
 npx @modelcontextprotocol/inspector node dist/server.js
 
-In MCP Inspector, connect to the server process and use the 7 tools below.
+In MCP Inspector, connect to the server process and use the 8 tools below.
 
 ### 2.1 How to fill fields in MCP Inspector
 
@@ -301,6 +301,24 @@ Use this when the Inspector shows separate fields on the left.
 - sharp_context:
   - leave empty, or use section 2.2 object
 
+### Tool 8: get_decision_trace
+
+- request_id:
+
+"paste a requestId returned from a previous tool call"
+
+- tool_name:
+
+"simulate_medication_change"
+
+- status:
+
+"success"
+
+- limit:
+
+10
+
 ## 2.4 How to read your first output (what it means)
 
 If you see text like:
@@ -316,7 +334,7 @@ Your takeaway is:
 3. The system is currently using deterministic fallback synthesis (not Groq/Gemini), which is expected if LLM keys are missing, unavailable, or fallback was selected.
 4. Patient context was applied if the summary includes age/conditions/renal context.
 
-## 3) Live Demo Script (One Pass, 7 Tools)
+## 3) Live Demo Script (One Pass, 8 Tools)
 
 Use these payloads exactly in Inspector.
 
@@ -526,6 +544,27 @@ Expected signal:
 - delta block includes scoreDelta and interactionDelta
 - newRisks and resolvedRisks show interaction changes caused by proposal
 
+### H) get_decision_trace
+
+What to enter in each field:
+
+- request_id (optional): exact UUID from a prior tool response to fetch one trace.
+- tool_name (optional): filter list mode by tool name (for example `check_drug_interactions`).
+- status (optional): `success` or `error`.
+- limit (optional): max number of traces in list mode (1-100).
+
+Input:
+{
+  "tool_name": "simulate_medication_change",
+  "status": "success",
+  "limit": 5
+}
+
+Expected signal:
+- structuredContent.traces array returned
+- each trace has inputSummary, outputSummary, and step-level timing
+- per-trace status is visible (`success` or `error`)
+
 ## 3.1 Copy-paste minimal inputs (fastest path)
 
 Use these if you want the smallest working payload per tool.
@@ -574,6 +613,11 @@ simulate_medication_change
     "drug": "ibuprofen",
     "replacement_drug": "acetaminophen"
   }
+}
+
+get_decision_trace
+{
+  "limit": 5
 }
 
 ## 3.2 Feature 3 Scenario Pack
