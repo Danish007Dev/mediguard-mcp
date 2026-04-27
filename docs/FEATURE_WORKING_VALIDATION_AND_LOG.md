@@ -167,6 +167,56 @@ Use this table to track upcoming features, their use, tests, and readiness.
 
 Use this section for clinical/manual completion records.
 
+### Feature 2 manual validation packet (ready to run)
+
+Objective:
+- Close remaining manual validation items for `calculate_patient_safety_score` and mark Feature 2 fully complete.
+
+Required reviewers:
+- 1 clinical pharmacist
+- 1 prescribing clinician (internal medicine/family medicine preferred)
+
+Recommended sample set:
+- 100 de-identified patient charts
+- Mix target: 25 low-risk, 35 medium-risk, 30 high-risk, 10 critical-risk regimens
+
+Review rubric (per chart):
+- Score band agreement (A/B/C/D/F or equivalent): pass/fail
+- Risk tier agreement (`low|medium|high|critical`): pass/fail
+- Major/contraindicated interaction capture: pass/fail
+- Beers flag correctness (when age >= 65): pass/fail
+- Duplicate therapeutic class flag correctness: pass/fail
+- Improvement opportunity clinical appropriateness: pass/fail
+- Dashboard artifact completeness (`scoreCard`, `severityChart`, `deductionBreakdown`, `opportunityQueue`, `flagsPanel`): pass/fail
+
+Acceptance thresholds:
+- Risk tier agreement >= 90%
+- Major/contraindicated capture sensitivity = 100%
+- Beers flag precision >= 95% on elderly subset
+- Dashboard artifact completeness = 100% of reviewed outputs
+
+Execution steps:
+1. Export a de-identified chart set and assign review IDs (`F2-CHART-001` to `F2-CHART-100`).
+2. Run `calculate_patient_safety_score` for each chart medication list.
+3. Record outputs and reviewer adjudication in the template table below.
+4. Calculate final agreement metrics and summarize gaps.
+5. Capture sign-off in the two reviewer blocks below.
+
+Feature 2 review tracking table template:
+
+| Review ID | Patient age band | Medication count | Tool risk level | Reviewer risk level | Risk agreement | Major/contra capture | Beers correctness | Duplicate-class correctness | Dashboard completeness | Reviewer notes |
+|---|---|---:|---|---|---|---|---|---|---|---|
+| F2-CHART-001 | 65-74 | 9 | high | high | pass | pass | pass | pass | pass | |
+| F2-CHART-002 | 75-84 | 14 | critical | high | fail | pass | pass | pass | pass | downgrade rationale required |
+
+Feature 2 closure checklist (manual):
+- [ ] 100/100 chart reviews completed
+- [ ] Pharmacist review completed and signed
+- [ ] Prescriber review completed and signed
+- [ ] Agreement metrics computed and attached
+- [ ] Any rubric failures triaged and resolved
+- [ ] Feature 2 moved to fully complete in this log and roadmap
+
 - UpToDate and Lexi-Comp cross-check reviewer:
 - Date:
 - Sample size reviewed:
@@ -178,6 +228,39 @@ Use this section for clinical/manual completion records.
 - Sample size reviewed:
 - Accuracy notes:
 - Required prompt/model adjustments:
+
+### Feature 2 reviewer sign-off block (copy/fill)
+
+- Reviewer role:
+- Reviewer name:
+- Date:
+- Chart sample size:
+- Risk-tier agreement (%):
+- Major/contraindicated capture sensitivity (%):
+- Beers precision on elderly subset (%):
+- Dashboard artifact completeness (%):
+- Open safety issues:
+- Final recommendation: approve / conditional approve / reject
+
+### Feature 2 progress snapshot (full-working status)
+
+Completed now:
+- Engineering implementation (`calculate_patient_safety_score` service + tool path)
+- Output contract hardened with `dashboardArtifact`
+- Unit coverage for deterministic scoring and key edge cases
+- SHARP hydration tool-path coverage
+- Safety performance baseline check (`<100ms` p95 with mocked interaction backend)
+- Demo readiness docs updated to 6-tool flow
+
+Remaining for full completion:
+- Manual chart validation (100 de-identified charts)
+- Pharmacist and prescriber sign-off
+- Final closure update in roadmap + validation log after manual review
+
+Current completion estimate (Feature 2):
+- Engineering + automated validation + demo-readiness: 100%
+- Manual clinical validation + sign-off: 0%
+- Overall full-working completion: ~85% (pending manual clinical closure)
 
 ## Automated validation run history
 
