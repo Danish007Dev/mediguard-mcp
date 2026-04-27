@@ -609,3 +609,46 @@ Mark complete when all are true:
   - npm start
 - Run validate to isolate whether failure is type/lint/test or runtime.
 - Confirm .env keys and outbound network access for external APIs.
+
+## 8) Manual Clinical Sign-Off (Feature 2 Final Closure)
+
+Engineering and automated tests are complete for Feature 2. The remaining work is clinical review sign-off.
+
+### What you need to do
+
+1. Generate the review worksheet:
+
+```bash
+npm run generate:feature2-sheet
+```
+
+This creates:
+- `docs/clinical/feature2_review_sheet.csv`
+
+2. Assign two reviewers:
+- 1 clinical pharmacist
+- 1 prescribing clinician
+
+3. Run the starter batch first:
+- Review IDs `F2-CHART-001` to `F2-CHART-010`
+- Resolve repeated disagreement patterns before scaling to all 100 charts
+
+4. Complete full manual adjudication:
+- Review all `F2-CHART-001` to `F2-CHART-100`
+- Record tool output vs reviewer judgment in the CSV
+
+5. Compute acceptance metrics:
+- Risk tier agreement >= 90%
+- Major/contraindicated capture sensitivity = 100%
+- Beers precision >= 95% on elderly subset
+- Dashboard artifact completeness = 100%
+
+6. Capture sign-off:
+- Fill reviewer sign-off blocks in `docs/FEATURE_WORKING_VALIDATION_AND_LOG.md`
+- Update Feature 2 status to fully complete in:
+  - `docs/FEATURE_WORKING_VALIDATION_AND_LOG.md`
+  - `docs/PHASE_6_7_ROADMAP.md`
+
+### Why this is required
+
+"15% remaining" means only human clinical validation is pending. Code-level implementation, tool wiring, tests, and demo payloads are already complete.
