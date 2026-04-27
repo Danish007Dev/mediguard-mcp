@@ -162,6 +162,7 @@ Use this table to track upcoming features, their use, tests, and readiness.
 ### 2026-04-27
 - Updated demo test playbook to a 6-tool flow including `calculate_patient_safety_score` with dashboardArtifact verification steps.
 - Added explicit Feature 2 roadmap checks for dashboardArtifact contract validation and demo readiness.
+- Added `npm run generate:feature2-sheet` automation to create `docs/clinical/feature2_review_sheet.csv` with 100 chart IDs and 25/35/30/10 risk-bucket distribution for manual clinical adjudication.
 
 ## Manual validation sign-off section
 
