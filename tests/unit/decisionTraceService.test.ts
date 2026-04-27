@@ -1,5 +1,5 @@
 import { DecisionTraceService } from "../../src/services/decisionTraceService";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -244,5 +244,67 @@ describe("DecisionTraceService", () => {
 
     expect(service.getTrace(firstRequestId)).toBeUndefined();
     expect(service.getTrace(secondRequestId)).toBeDefined();
+  });
+
+  it("replays archived traces on service startup", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "mediguard-trace-replay-"));
+    const archivePath = join(tempDir, "decision-trace.ndjson");
+
+    appendFileSync(
+      archivePath,
+      `${JSON.stringify({
+        requestId: "30303030-3030-4030-8030-303030303030",
+        toolName: "check_drug_interactions",
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        status: "success",
+        inputSummary: { patient_id: "patient-99" },
+        outputSummary: { riskLevel: "medium" },
+        steps: [],
+      })}\n`,
+      "utf8",
+    );
+
+    const service = new DecisionTraceService({ archivePath });
+
+    const restored = service.getTrace("30303030-3030-4030-8030-303030303030");
+    expect(restored).toBeDefined();
+    expect(restored?.inputSummary.patient_id).toBe("[REDACTED]");
+  });
+
+  it("returns dashboard artifact with summary and tool breakdown", () => {
+    const service = new DecisionTraceService();
+
+    service.startTrace({
+      requestId: "40404040-4040-4040-8040-404040404040",
+      toolName: "check_drug_interactions",
+      inputSummary: {},
+    });
+    service.completeTrace({
+      requestId: "40404040-4040-4040-8040-404040404040",
+      outputSummary: { riskLevel: "medium" },
+    });
+
+    service.startTrace({
+      requestId: "50505050-5050-4050-8050-505050505050",
+      toolName: "check_drug_interactions",
+      inputSummary: {},
+    });
+    service.failTrace({
+      requestId: "50505050-5050-4050-8050-505050505050",
+      code: "INTERNAL_ERROR",
+      message: "simulated",
+    });
+
+    const artifact = service.getDashboard({
+      windowMinutes: 60,
+      limit: 10,
+    });
+
+    expect(artifact.summary.totalTraces).toBe(2);
+    expect(artifact.summary.successCount).toBe(1);
+    expect(artifact.summary.errorCount).toBe(1);
+    expect(artifact.toolBreakdown[0]?.toolName).toBe("check_drug_interactions");
+    expect(artifact.recentTraces.length).toBeGreaterThan(0);
   });
 });

@@ -140,18 +140,19 @@ Use this table to track upcoming features, their use, tests, and readiness.
 | F1 | Evidence-Based Recommendations with PubMed | Add literature-backed interaction evidence in interaction output | `check_drug_interactions` -> `llmSynthesis.evidenceSummaries` | Unit tests + 50-pair API sweep + manual clinical checks | Closed (engineering scope complete; manual clinical checks pending) |
 | F2 | Patient Safety Score Dashboard | Quantified medication risk scoring and improvement opportunities | `calculate_patient_safety_score` tool + dashboard-ready scoring payload | Algorithm unit tests + scenario tests + performance <100ms | In progress (engineering + demo payload complete; manual chart/pharmacist validation pending) |
 | F3 | What-If Simulator | Compare risk before/after medication changes | `simulate_medication_change` tool output with before/after snapshots and risk deltas | 100+ scenario tests + deterministic delta checks + <2s target | In progress (backend service + MCP tool + baseline unit tests implemented) |
-| F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | `get_decision_trace` tool + decision trace capture in all clinical tools | Trace store lifecycle tests + retrieval tests + PHI safety checks | In progress (vertical slice implemented and validated with unit coverage) |
+| F4 | Explainable AI Dashboard | Traceable decision path and observability for clinical confidence | `get_decision_trace` + `get_decision_trace_dashboard` with cross-tool trace capture | Trace store lifecycle tests + retrieval tests + PHI safety/perf checks | Engineering complete (operational sign-off checklist provided) |
 | F5 | Real-Time Multi-Agent Demo | Show cross-agent orchestration for medication safety | Demo agent workflow with MCP calls | End-to-end scripted scenario tests | Planned |
 | F6 | Epic Workflow Integration Mockup | Demonstrate EHR-embedded safety workflow | Mock workflow artifacts + integration narrative | UX walkthrough tests + scenario validation | Planned |
 
 ## Feature 4: Explainable AI Dashboard
 
 ### Current implementation status
-Status: In progress (hardening slice complete).
+Status: Engineering complete (operational sign-off pending owner approval).
 
 Implemented in:
 - `src/services/decisionTraceService.ts`
 - `src/tools/getDecisionTrace.ts`
+- `src/tools/getDecisionTraceDashboard.ts`
 - `src/tools/registerTools.ts`
 - `src/tools/checkDrugInteractions.ts`
 - `src/tools/analyzePolypharmacy.ts`
@@ -164,8 +165,9 @@ Implemented in:
 Hardening additions:
 - PHI-safe redaction in trace summaries and step details.
 - Configurable in-memory retention policy (`DECISION_TRACE_MAX_RECORDS`, `DECISION_TRACE_MAX_AGE_MS`).
-- Optional append-only archive persistence (`DECISION_TRACE_ARCHIVE_PATH`).
+- Optional append-only archive persistence (`DECISION_TRACE_ARCHIVE_PATH`) with replay on startup.
 - High-volume retention and retrieval-latency safety baseline test.
+- Operational policy template: `docs/DECISION_TRACE_RETENTION_POLICY.md`.
 
 ### How to see Feature 4 working
 1. Run any clinical tool call (for example `check_drug_interactions`) and copy the returned `requestId`.
@@ -182,6 +184,20 @@ Hardening additions:
 - `inputSummary` and `outputSummary`
 - `steps[]` with `name`, `status`, `durationMs`, and `details`
 
+4. Run `get_decision_trace_dashboard` with:
+
+```json
+{
+  "window_minutes": 1440,
+  "limit": 20
+}
+```
+
+5. Verify dashboard sections in `structuredContent`:
+- `summary`
+- `toolBreakdown`
+- `recentTraces`
+
 ### Feature 4 quick validation command
 
 ```bash
@@ -191,6 +207,7 @@ npm run validate:feature4
 Includes:
 - Feature 4 unit suites for trace service/tools/instrumented tool paths.
 - `tests/safety/decisionTrace.performance.safety.test.ts` high-volume retention and p95 retrieval checks.
+- Dashboard tool unit coverage (`tests/unit/getDecisionTraceDashboardTool.test.ts`).
 
 ## Execution log
 
@@ -220,6 +237,8 @@ Includes:
 - Expanded demo guidance to 8 tools, including explicit decision trace retrieval workflow.
 - Hardened Feature 4 with PHI redaction, configurable retention/TTL policy, optional archive persistence, and a dedicated safety performance baseline.
 - Added repeatable validation command: `npm run validate:feature4`.
+- Added dashboard-ready aggregation endpoint `get_decision_trace_dashboard` and startup archive replay.
+- Added operational retention/sign-off policy template at `docs/DECISION_TRACE_RETENTION_POLICY.md`.
 
 ## Manual validation sign-off section
 

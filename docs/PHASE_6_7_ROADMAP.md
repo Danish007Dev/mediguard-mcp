@@ -575,9 +575,10 @@ Or: Discontinue warfarin, start DOAC + Aspirin (predicted score: 88/100)
 **Judging Criteria**: ✅✅ AI Factor, ✅ Potential Impact, ✅✅ Feasibility
 
 **Current status (Apr 27, 2026)**:
-- In progress: decision trace vertical slice is implemented with retrieval (`get_decision_trace`) and step-level capture across all 7 clinical analysis tools.
-- In progress: hardening completed for PHI-safe redaction, configurable retention/TTL policy, and optional append-only archive persistence.
-- Pending: durable production storage backend, operational retention policy sign-off, and UI/dashboard rendering layer.
+- Complete (engineering): decision trace capture is active across all 7 clinical analysis tools.
+- Complete (engineering): trace retrieval (`get_decision_trace`) and dashboard aggregation (`get_decision_trace_dashboard`) are implemented.
+- Complete (engineering): PHI-safe redaction, retention/TTL controls, and archive replay-backed durability are implemented.
+- Operational closure checklist is published in `docs/DECISION_TRACE_RETENTION_POLICY.md` for owner/security sign-off.
 
 **Why It Wins**:
 - **Piyush**: Transparency, clinical validation, BrainX values explainability

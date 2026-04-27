@@ -387,3 +387,39 @@ export interface DecisionTraceRecord {
   steps: DecisionTraceStep[];
   error?: DecisionTraceError;
 }
+
+export interface DecisionTraceDashboardSummary {
+  totalTraces: number;
+  successCount: number;
+  errorCount: number;
+  successRate: number;
+}
+
+export interface DecisionTraceToolBreakdown {
+  toolName: string;
+  total: number;
+  successCount: number;
+  errorCount: number;
+  averageDurationMs: number;
+  p95DurationMs: number;
+  lastSeenAt: string;
+}
+
+export interface DecisionTraceRecentItem {
+  requestId: string;
+  toolName: string;
+  status: "success" | "error";
+  startedAt: string;
+  finishedAt: string;
+  totalDurationMs: number;
+  stepCount: number;
+  errorCode?: string;
+}
+
+export interface DecisionTraceDashboardArtifact {
+  generatedAt: string;
+  windowMinutes: number;
+  summary: DecisionTraceDashboardSummary;
+  toolBreakdown: DecisionTraceToolBreakdown[];
+  recentTraces: DecisionTraceRecentItem[];
+}

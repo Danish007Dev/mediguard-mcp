@@ -1,7 +1,7 @@
 # MediGuard MCP Demo + Test Playbook (After Phase 6 Feature 2)
 
 This guide lets you do two things:
-1. Run a real end-to-end product demo of all 8 tools.
+1. Run a real end-to-end product demo of all 9 tools.
 2. Verify everything built through Phase 6 Feature 3 baseline (validation, fallback, observability, reliability, dashboard-ready scoring output, and what-if simulation deltas).
 
 ## 1) Prerequisites
@@ -27,7 +27,7 @@ Open a second terminal in the same folder:
 
 npx @modelcontextprotocol/inspector node dist/server.js
 
-In MCP Inspector, connect to the server process and use the 8 tools below.
+In MCP Inspector, connect to the server process and use the 9 tools below.
 
 ### 2.1 How to fill fields in MCP Inspector
 
@@ -319,6 +319,20 @@ Use this when the Inspector shows separate fields on the left.
 
 10
 
+### Tool 9: get_decision_trace_dashboard
+
+- tool_name:
+
+"check_drug_interactions"
+
+- window_minutes:
+
+1440
+
+- limit:
+
+20
+
 ## 2.4 How to read your first output (what it means)
 
 If you see text like:
@@ -334,7 +348,7 @@ Your takeaway is:
 3. The system is currently using deterministic fallback synthesis (not Groq/Gemini), which is expected if LLM keys are missing, unavailable, or fallback was selected.
 4. Patient context was applied if the summary includes age/conditions/renal context.
 
-## 3) Live Demo Script (One Pass, 8 Tools)
+## 3) Live Demo Script (One Pass, 9 Tools)
 
 Use these payloads exactly in Inspector.
 
@@ -565,6 +579,25 @@ Expected signal:
 - each trace has inputSummary, outputSummary, and step-level timing
 - per-trace status is visible (`success` or `error`)
 
+### I) get_decision_trace_dashboard
+
+What to enter in each field:
+
+- tool_name (optional): filter dashboard to one tool.
+- window_minutes (optional): aggregation window in minutes (1 to 10080).
+- limit (optional): max recent traces shown (1 to 100).
+
+Input:
+{
+  "window_minutes": 1440,
+  "limit": 20
+}
+
+Expected signal:
+- summary block with totalTraces, successCount, errorCount, successRate
+- toolBreakdown block with avg/p95 duration and volume per tool
+- recentTraces block with latest request IDs and durations
+
 ## 3.1 Copy-paste minimal inputs (fastest path)
 
 Use these if you want the smallest working payload per tool.
@@ -620,6 +653,12 @@ get_decision_trace
   "limit": 5
 }
 
+get_decision_trace_dashboard
+{
+  "window_minutes": 1440,
+  "limit": 20
+}
+
 ## 3.2 Feature 3 Scenario Pack
 
 Use the preloaded What-If examples in:
@@ -663,6 +702,7 @@ Feature-specific quick validation:
 
 ```bash
 npm run validate:feature3
+npm run validate:feature4
 ```
 
 ### C) Fallback behavior test (Phase 5 reliability)

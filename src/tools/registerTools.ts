@@ -41,6 +41,11 @@ import {
   getDecisionTraceOutputSchema,
   executeGetDecisionTrace,
 } from "./getDecisionTrace";
+import {
+  getDecisionTraceDashboardInputSchema,
+  getDecisionTraceDashboardOutputSchema,
+  executeGetDecisionTraceDashboard,
+} from "./getDecisionTraceDashboard";
 import { OpenFdaClient } from "../clients/openFdaClient";
 import { PubMedClient } from "../clients/pubMedClient";
 import { RxNormClient } from "../clients/rxNormClient";
@@ -278,6 +283,29 @@ export function registerTools(server: McpServer, logger: Logger): void {
     },
     async (args) =>
       executeGetDecisionTrace(args, {
+        traceService: decisionTraceService,
+        logger,
+      }),
+  );
+
+  server.registerTool(
+    "get_decision_trace_dashboard",
+    {
+      title: "Get Decision Trace Dashboard",
+      description:
+        "Returns dashboard-ready aggregate metrics from decision traces for explainability and operations.",
+      inputSchema: getDecisionTraceDashboardInputSchema,
+      outputSchema: getDecisionTraceDashboardOutputSchema,
+      annotations: {
+        title: "Medication Safety",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) =>
+      executeGetDecisionTraceDashboard(args, {
         traceService: decisionTraceService,
         logger,
       }),
