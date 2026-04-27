@@ -202,6 +202,28 @@ Execution steps:
 4. Calculate final agreement metrics and summarize gaps.
 5. Capture sign-off in the two reviewer blocks below.
 
+Starter batch (first 10 charts):
+- Goal: complete an initial adjudication wave before scaling to 100 charts.
+- Suggested mix target: 2 low risk, 3 medium risk, 3 high risk, 2 critical risk.
+
+| Review ID | Target risk bucket | Patient age band | Medication count target | Primary review focus | Assigned reviewer |
+|---|---|---|---:|---|---|
+| F2-CHART-001 | low | 18-44 | 1-4 | Baseline score/grade sanity | |
+| F2-CHART-002 | low | 45-64 | 3-6 | Low-risk opportunity quality | |
+| F2-CHART-003 | medium | 45-64 | 5-8 | Moderate interaction weighting | |
+| F2-CHART-004 | medium | 65-74 | 6-10 | Elderly Beers flag precision | |
+| F2-CHART-005 | medium | 75-84 | 6-10 | Polypharmacy deduction calibration | |
+| F2-CHART-006 | high | 65-74 | 8-12 | Major interaction capture | |
+| F2-CHART-007 | high | 75-84 | 10-14 | Duplicate-class risk correctness | |
+| F2-CHART-008 | high | 85+ | 8-12 | Beers plus interaction compounding | |
+| F2-CHART-009 | critical | 65-74 | 8-14 | Contraindicated/major sensitivity | |
+| F2-CHART-010 | critical | 75-84 | 10-16 | End-to-end dashboard completeness | |
+
+Starter batch completion gate:
+- [ ] All 10 starter charts reviewed by both roles (pharmacist + prescriber)
+- [ ] Agreement metrics computed for starter batch
+- [ ] Any repeated disagreement pattern documented before scaling to 100 charts
+
 Feature 2 review tracking table template:
 
 | Review ID | Patient age band | Medication count | Tool risk level | Reviewer risk level | Risk agreement | Major/contra capture | Beers correctness | Duplicate-class correctness | Dashboard completeness | Reviewer notes |
