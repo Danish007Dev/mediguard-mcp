@@ -366,6 +366,12 @@ OPTIMIZED SCORE: 93/100 ✅ (Grade: A, Risk: LOW)
 - [x] Verify Beers Criteria accuracy (100% match in current automated rule test set; full clinical chart validation pending)
 - [x] Test edge cases (0 meds, 30+ meds)
 - [x] Performance: <100ms calculation time (p95 achieved in mocked-backend safety test)
+- [x] Verify dashboardArtifact output contract (scoreCard, severityChart, deductionBreakdown, opportunityQueue, flagsPanel)
+
+**Demo Readiness (Feature 2)**:
+- [x] 6-tool Inspector playbook updated with calculate_patient_safety_score scenario
+- [x] Feature 2 includes UI-ready dashboard payload in structured output
+- [ ] Manual clinical review evidence attached (de-identified chart + pharmacist sign-off)
 
 ---
 
