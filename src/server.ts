@@ -3,6 +3,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import { env } from "./config/env";
 import { Logger } from "./logging/logger";
 import { registerTools } from "./tools/registerTools";
@@ -127,6 +129,23 @@ async function startHttpServer(): Promise<void> {
         logger.info("New MCP session created", { sessionId: newSessionId });
       }
 
+      return;
+    }
+
+    // Serve favicon for Claude Desktop and browsers
+    if (req.url === "/favicon.ico") {
+      try {
+        const logoPath = path.join(process.cwd(), "assets", "logo.png");
+        const logo = fs.readFileSync(logoPath);
+        res.writeHead(200, {
+          "Content-Type": "image/png",
+          "Cache-Control": "public, max-age=86400"
+        });
+        res.end(logo);
+      } catch (err) {
+        res.writeHead(404);
+        res.end();
+      }
       return;
     }
 

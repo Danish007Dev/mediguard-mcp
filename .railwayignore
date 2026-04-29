@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+tests/
+demos/
+docs/
+*.md
+.git/
+.github/
+.vscode/
+scripts/
+coverage/

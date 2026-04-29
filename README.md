@@ -1,5 +1,9 @@
 # 🛡️ MediGuard MCP - Medication Safety Intelligence
 
+<p align="center">
+  <img src="assets/logo.png" alt="MediGuard Logo" width="200"/>
+</p>
+
 [![CI/CD](https://github.com/yourusername/mediguard-mcp/workflows/CI%2FCD/badge.svg)](https://github.com/yourusername/mediguard-mcp/actions)
 [![Test Coverage](https://codecov.io/gh/yourusername/mediguard-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/mediguard-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
