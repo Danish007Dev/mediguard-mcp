@@ -26,6 +26,7 @@
     "type-check": "tsc --noEmit",
     "validate": "npm run type-check && npm run lint && npm test",
     "prepare": "husky install",
+    "demo:agents": "npx ts-node demos/multi-agent-demo.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('coverage',{recursive:true,force:true});\""
   },
   "keywords": [
@@ -41,7 +42,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^16.4.5",
     "fast-xml-parser": "^5.7.1",
     "zod": "^3.22.4"
