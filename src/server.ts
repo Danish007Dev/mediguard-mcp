@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { env } from "./config/env";
 import { Logger } from "./logging/logger";
@@ -15,29 +16,42 @@ const logger = new Logger(env.LOG_LEVEL, {
 let shuttingDown = false;
 let httpServer: http.Server | undefined;
 
-// ---------------------------------------------------------------------------
-// HTTP mode: StreamableHTTPServerTransport + health check (for Railway / Claude)
-// ---------------------------------------------------------------------------
+// Store active sessions (server + transport pairs) for stateful mode
+const sessions = new Map<
+  string,
+  { server: McpServer; transport: StreamableHTTPServerTransport }
+>();
 
-async function startHttpServer(): Promise<void> {
+/**
+ * Creates a new McpServer with all tools registered and connects it to the transport.
+ */
+async function createConnectedServer(
+  transport: StreamableHTTPServerTransport,
+): Promise<McpServer> {
   const server = new McpServer({
     name: env.MCP_SERVER_NAME,
     version: env.MCP_SERVER_VERSION,
   });
 
   registerTools(server, logger.child({ component: "tools" }));
-
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-
   await server.connect(transport);
+  return server;
+}
 
+// ---------------------------------------------------------------------------
+// HTTP mode: StreamableHTTPServerTransport (for Railway / Claude remote)
+// ---------------------------------------------------------------------------
+
+async function startHttpServer(): Promise<void> {
   httpServer = http.createServer(async (req, res) => {
     // CORS headers for browser-based MCP clients
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, mcp-session-id");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Accept, mcp-session-id, mcp-protocol-version",
+    );
+    res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
@@ -54,20 +68,15 @@ async function startHttpServer(): Promise<void> {
           server: env.MCP_SERVER_NAME,
           version: env.MCP_SERVER_VERSION,
           transport: "streamable-http",
+          activeSessions: sessions.size,
           timestamp: new Date().toISOString(),
         }),
       );
       return;
     }
 
-    // MCP endpoint — this is what Claude connects to
-    if (req.url === "/mcp") {
-      await transport.handleRequest(req, res);
-      return;
-    }
-
     // Root — server info
-    if (req.url === "/") {
+    if (req.url === "/" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
@@ -78,6 +87,46 @@ async function startHttpServer(): Promise<void> {
           healthEndpoint: "/health",
         }),
       );
+      return;
+    }
+
+    // MCP endpoint — this is what Claude connects to
+    if (req.url === "/mcp") {
+      // Check for existing session
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      let session = sessionId ? sessions.get(sessionId) : undefined;
+
+      if (session) {
+        // Existing session — route to its transport
+        await session.transport.handleRequest(req, res);
+        return;
+      }
+
+      // No existing session — create a new one with session management
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+      });
+
+      transport.onclose = () => {
+        const sid = transport.sessionId;
+        if (sid) {
+          sessions.delete(sid);
+          logger.info("Session closed", { sessionId: sid });
+        }
+      };
+
+      const server = await createConnectedServer(transport);
+
+      // Handle the request (this will be the initialize request)
+      await transport.handleRequest(req, res);
+
+      // Store the session for subsequent requests
+      const newSessionId = transport.sessionId;
+      if (newSessionId) {
+        sessions.set(newSessionId, { server, transport });
+        logger.info("New MCP session created", { sessionId: newSessionId });
+      }
+
       return;
     }
 
@@ -135,6 +184,14 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   logger.info("Shutdown signal received", { signal });
 
   try {
+    // Close all active sessions
+    for (const [sid, session] of sessions) {
+      await session.transport.close();
+      await session.server.close();
+      logger.info("Session cleaned up", { sessionId: sid });
+    }
+    sessions.clear();
+
     httpServer?.close();
     logger.info("MediGuard MCP server stopped gracefully");
     process.exit(0);
