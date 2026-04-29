@@ -61,6 +61,8 @@ const envSchema = z.object({
   DECISION_TRACE_MAX_RECORDS: z.coerce.number().int().positive().default(1000),
   DECISION_TRACE_MAX_AGE_MS: z.coerce.number().int().positive().default(86400000),
   DECISION_TRACE_ARCHIVE_PATH: optionalString,
+  MCP_TRANSPORT: z.enum(["stdio", "http"]).default("stdio"),
+  PORT: z.coerce.number().int().positive().default(3000),
 });
 
 const parsed = envSchema.safeParse(process.env);
