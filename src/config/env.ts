@@ -56,7 +56,7 @@ const envSchema = z.object({
   FHIR_PAGE_SIZE: z.coerce.number().int().positive().default(50),
   FHIR_MAX_PAGES: z.coerce.number().int().positive().default(20),
   FHIR_DEFAULT_TOKEN_ENDPOINT: optionalString,
-  API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  API_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
   DRUG_CACHE_TTL: z.coerce.number().int().positive().default(86400),
   DECISION_TRACE_MAX_RECORDS: z.coerce.number().int().positive().default(1000),
   DECISION_TRACE_MAX_AGE_MS: z.coerce.number().int().positive().default(86400000),
