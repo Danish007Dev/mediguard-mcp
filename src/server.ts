@@ -96,7 +96,7 @@ async function startHttpServer(): Promise<void> {
     if (req.url === "/mcp") {
       // Check for existing session
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
-      let session = sessionId ? sessions.get(sessionId) : undefined;
+      const session = sessionId ? sessions.get(sessionId) : undefined;
 
       if (session) {
         // Existing session — route to its transport

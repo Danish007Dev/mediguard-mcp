@@ -461,7 +461,9 @@ describe("PubMedClient", () => {
 
     if (typeof firstCall === "string") {
       const url = new URL(firstCall);
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(url.searchParams.get("email")).toBe("team@example.com");
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(url.searchParams.get("api_key")).toBe("demo-pubmed-key");
     }
   });

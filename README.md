@@ -4,8 +4,8 @@
   <img src="assets/logo.png" alt="MediGuard Logo" width="200"/>
 </p>
 
-[![CI/CD](https://github.com/yourusername/mediguard-mcp/workflows/CI%2FCD/badge.svg)](https://github.com/yourusername/mediguard-mcp/actions)
-[![Test Coverage](https://codecov.io/gh/yourusername/mediguard-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/mediguard-mcp)
+[![CI/CD](https://github.com/danish007dev/mediguard-mcp/workflows/CI%2FCD/badge.svg)](https://github.com/danish007dev/mediguard-mcp/actions)
+[![Test Coverage](https://codecov.io/gh/danish007dev/mediguard-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/danish007dev/mediguard-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **An intelligent MCP server that prevents medication errors through AI-powered drug interaction checking, polypharmacy analysis, and contraindication detection.**
@@ -46,7 +46,7 @@ Think of it as a clinical pharmacist that:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mediguard-mcp.git
+git clone https://github.com/danish007dev/mediguard-mcp.git
 cd mediguard-mcp
 
 # Install dependencies
@@ -95,7 +95,7 @@ See detailed safety language in [docs/SAFETY_DISCLAIMER.md](docs/SAFETY_DISCLAIM
 
 ## 🔧 Available Tools
 
-MediGuard exposes 5 core medication safety tools via MCP:
+MediGuard exposes 9 MCP tools for medication safety, optimization, and observability. Full schemas and optional fields are documented in [docs/API_REFERENCE.md](docs/API_REFERENCE.md).
 
 ### 1. `check_drug_interactions`
 Analyzes potential drug-drug interactions across a medication list.
@@ -105,62 +105,148 @@ Analyzes potential drug-drug interactions across a medication list.
 {
   "medications": ["warfarin", "ibuprofen", "aspirin"],
   "patient_context": {
+    "age": 72,
+    "conditions": ["ckd"],
+    "renal_function": "egfr 30"
+  },
+  "sharp_context": {
     "patient_id": "patient-123",
     "fhir_endpoint": "https://fhir.example.com",
-    "fhir_token": "bearer-token"
+    "auth_token": "bearer-token"
   }
 }
 ```
 
-**Output:**
+**Returns:** `riskLevel`, `interactions[]`, `analysisRecommendations[]`, `analysisProvider`, `normalizedMedications[]`
+
+### 2. `analyze_polypharmacy`
+Evaluates polypharmacy burden using Beers-style flags, duplicate classes, and deprescribing cues.
+
+**Input:**
 ```json
 {
-  "riskLevel": "high",
-  "analysisProvider": "groq",
-  "analysisRecommendations": [
-    "Avoid routine NSAID use when clinically feasible.",
-    "Increase INR and bleeding symptom monitoring if unavoidable."
-  ],
-  "interactions": [
-    {
-      "drugs": ["warfarin", "ibuprofen"],
-      "severity": "major",
-      "mechanism": "NSAIDs increase bleeding risk with anticoagulants",
-      "clinicalImpact": "13x increased risk of GI bleeding",
-      "recommendations": [
-        "Use acetaminophen instead of ibuprofen",
-        "If NSAID necessary, add PPI prophylaxis",
-        "Monitor INR more frequently"
-      ]
-    }
-  ],
-  "summary": "This combination carries significant bleeding risk..."
+  "patient_age": 74,
+  "patient_conditions": ["heart failure"],
+  "current_medications": ["diazepam", "diphenhydramine"]
 }
 ```
 
-### 2. `analyze_polypharmacy`
-Evaluates medication regimen for polypharmacy risks using Beers Criteria and STOPP/START.
-
-**Use case:** Elderly patient on 15+ medications  
-**Output:** Potentially inappropriate medications, deprescribing opportunities, safer alternatives
+**Returns:** `riskLevel`, `beersFlags[]`, `duplicateTherapeuticClasses[]`, `drugBurdenIndex`, `deprescribingOpportunities[]`
 
 ### 3. `check_contraindications`
-Verifies if proposed medication is safe given patient allergies, conditions, and lab values.
+Validates proposed medications against allergies, conditions, labs, and DailyMed label evidence.
 
-**Use case:** Patient with penicillin allergy prescribed amoxicillin  
-**Output:** Cross-reactivity warning, safer antibiotic alternatives
+**Input:**
+```json
+{
+  "proposed_medication": "metformin",
+  "patient_allergies": ["penicillin"],
+  "patient_conditions": ["ckd"],
+  "lab_values": { "egfr": 25 }
+}
+```
+
+**Returns:** `contraindicated`, `contraindications[]`, `labelEvidence`, `analysisRecommendations[]`
 
 ### 4. `get_safer_alternatives`
-Recommends therapeutically equivalent but safer alternatives based on patient-specific risks.
+Ranks safer alternatives using patient risks and optional formulary preferences.
 
-**Use case:** High-risk drug interaction identified  
-**Output:** Alternative medications with rationale, formulary status
+**Input:**
+```json
+{
+  "proposed_medication": "ibuprofen",
+  "current_medications": ["warfarin"],
+  "patient_conditions": ["gi bleed history"],
+  "formulary_preferred": ["acetaminophen"],
+  "max_alternatives": 3
+}
+```
+
+**Returns:** `alternatives[]`, `riskContext[]`, `riskLevel`, `analysisRecommendations[]`
 
 ### 5. `explain_medication_safety`
-Generates patient-friendly or provider-facing explanations of safety concerns.
+Generates patient- or provider-facing explanations of safety findings.
 
-**Use case:** Patient education about why medication change is needed  
-**Output:** Grade-8 reading level explanation with actionable steps
+**Input:**
+```json
+{
+  "audience": "patient",
+  "language": "en",
+  "medication": "warfarin",
+  "risk_level": "high",
+  "findings": [
+    {
+      "issue": "Drug interaction",
+      "severity": "major",
+      "clinical_impact": "Potential serious bleeding",
+      "recommended_action": "Avoid NSAID overlap"
+    }
+  ],
+  "recommendations": ["Use acetaminophen instead of ibuprofen"]
+}
+```
+
+**Returns:** `headline`, `explanation`, `keyPoints[]`, `followUpQuestions[]`, `disclaimer`
+
+### 6. `calculate_patient_safety_score`
+Computes a 0-100 safety score with deduction detail and a UI-ready dashboard artifact.
+
+**Input:**
+```json
+{
+  "patient_age": 72,
+  "patient_conditions": ["atrial fibrillation"],
+  "current_medications": ["warfarin", "ibuprofen", "aspirin"]
+}
+```
+
+**Returns:** `score`, `grade`, `riskLevel`, `deductions[]`, `interactionSummary`, `dashboardArtifact`
+
+### 7. `simulate_medication_change`
+Simulates add/remove/replace scenarios and compares safety score deltas.
+
+**Input:**
+```json
+{
+  "patient_age": 72,
+  "patient_conditions": ["atrial fibrillation"],
+  "current_medications": ["warfarin", "ibuprofen"],
+  "proposed_change": {
+    "action": "replace",
+    "drug": "ibuprofen",
+    "replacement_drug": "acetaminophen"
+  }
+}
+```
+
+**Returns:** `recommendation`, `delta`, `newRisks[]`, `resolvedRisks[]`, `current`, `proposed`
+
+### 8. `get_decision_trace`
+Retrieves decision traces for explainability and debugging.
+
+**Input:**
+```json
+{
+  "tool_name": "check_drug_interactions",
+  "status": "error",
+  "limit": 5
+}
+```
+
+**Returns:** `traces[]` with step-level timing and summaries
+
+### 9. `get_decision_trace_dashboard`
+Returns aggregate decision-trace metrics for operational dashboards.
+
+**Input:**
+```json
+{
+  "window_minutes": 1440,
+  "limit": 20
+}
+```
+
+**Returns:** `summary`, `toolBreakdown[]`, `recentTraces[]`
 
 ---
 
@@ -184,10 +270,10 @@ MediGuard fully supports the SHARP extension for healthcare context propagation,
 // Prior Authorization Agent calls MediGuard
 const result = await mcpClient.callTool('check_drug_interactions', {
   medications: ['new-prescription'],
-  patient_context: {
+  sharp_context: {
     patient_id: 'P12345',
     fhir_endpoint: 'https://ehr.hospital.com/fhir',
-    fhir_token: session.token  // Propagated from EHR session
+    auth_token: session.token // Propagated from EHR session
   }
 });
 
@@ -233,6 +319,10 @@ All data sources are **public APIs** - no proprietary databases required.
                  ├─ check_contraindications()
                  ├─ get_safer_alternatives()
                  ├─ explain_medication_safety()
+                 ├─ calculate_patient_safety_score()
+                 ├─ simulate_medication_change()
+                 ├─ get_decision_trace()
+                 ├─ get_decision_trace_dashboard()
                  ↓
 ┌─────────────────────────────────────────────────┐
 │         MediGuard MCP Server                     │
@@ -272,12 +362,12 @@ const mediguard = new McpClient('mediguard-mcp');
 async function reviewPriorAuth(prescription, patientContext) {
   const safetyCheck = await mediguard.callTool('check_drug_interactions', {
     medications: [prescription.drug],
-    patient_context: patientContext
+    sharp_context: patientContext.sharp_context
   });
   
-  if (safetyCheck.risk_level === 'high') {
+  if (safetyCheck.riskLevel === 'high' || safetyCheck.riskLevel === 'critical') {
     // Request clinical justification
-    return { status: 'needs_review', reason: safetyCheck.explanation };
+    return { status: 'needs_review', reason: safetyCheck.summary };
   }
   
   return { status: 'approved' };
@@ -290,12 +380,13 @@ async function reviewPriorAuth(prescription, patientContext) {
 // Agent validates discharge medications before patient leaves
 async function prepareDischargeMeds(dischargeMeds, patientContext) {
   const polypharmacyCheck = await mediguard.callTool('analyze_polypharmacy', {
-    medications: dischargeMeds,
+    current_medications: dischargeMeds,
     patient_age: patientContext.age,
-    patient_context: patientContext.sharp_context
+    patient_conditions: patientContext.conditions ?? [],
+    sharp_context: patientContext.sharp_context
   });
   
-  if (polypharmacyCheck.inappropriate_meds.length > 0) {
+  if (polypharmacyCheck.beersFlags.length > 0 || polypharmacyCheck.deprescribingOpportunities.length > 0) {
     // Flag for pharmacist review
     await notifyPharmacist(polypharmacyCheck);
   }
@@ -311,13 +402,14 @@ async function onPrescriptionChange(newDrug, currentMeds, patient) {
     proposed_medication: newDrug,
     patient_allergies: patient.allergies,
     patient_conditions: patient.conditions,
-    patient_context: patient.sharp_context
+    lab_values: patient.labs,
+    sharp_context: patient.sharp_context
   });
   
-  if (contraindications.is_contraindicated) {
+  if (contraindications.contraindicated) {
     // Show warning to clinician with alternatives
-    showWarning(contraindications.reason);
-    suggestAlternatives(contraindications.alternatives);
+    showWarning(contraindications.summary);
+    suggestAlternatives(contraindications.analysisRecommendations);
   }
 }
 ```
@@ -333,11 +425,30 @@ npm test
 
 ### Run Specific Test Suites
 ```bash
-npm run test:unit           # Unit tests only
-npm run test:integration    # Integration tests
-npm run test:safety         # Safety validation tests
+npm run test:unit           # Unit tests (32 suites)
+npm run test:integration    # Integration tests (FHIR + SHARP flows)
+npm run test:safety         # Safety, HIPAA, and performance checks
+npx jest tests/e2e          # End-to-end via MCP StdioTransport
 npm run test:coverage       # With coverage report
+npm run validate:feature3   # What-If Simulator validation
+npm run validate:feature4   # Decision Trace validation
 ```
+
+### Latest Test Results (2026-05-01)
+
+| Suite | Suites | Tests | Status |
+|---|---:|---:|---|
+| **Unit** | 32 | 208 | ✅ All pass |
+| **Integration** | 2 (+1 skip) | 2 (+1 skip) | ✅ All pass |
+| **Safety** | 8 | 14 | ✅ All pass |
+| **End-to-End** | 1 | 30 | ✅ All pass |
+| **Type Check** | — | — | ✅ 0 errors |
+| **Lint** | — | — | ✅ 0 errors |
+| **Total** | **43** | **254** | **✅ 0 failures** |
+
+E2E tests exercise all 9 MCP tools against real external APIs (RxNorm, OpenFDA, DailyMed, PubMed) via `StdioClientTransport`.
+
+Full run history: [`my-docs/clinical review/FEATURE_WORKING_VALIDATION_AND_LOG.md`](my-docs/clinical%20review/FEATURE_WORKING_VALIDATION_AND_LOG.md)
 
 ### Test Coverage Requirements
 - Minimum **80%** overall coverage
@@ -409,6 +520,7 @@ All safety checks are logged (without PHI) for:
 - Clinical validation
 - Performance monitoring
 - Continuous improvement
+ - Decision trace metrics via `get_decision_trace` and `get_decision_trace_dashboard`
 
 ---
 
@@ -452,7 +564,7 @@ Built for the **Agents Assemble Healthcare AI Hackathon** by [Prompt Opinion](ht
 
 - **Demo Video**: [YouTube Link]
 - **Devpost**: [Hackathon Submission]
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mediguard-mcp/issues)
+- **Issues**: [GitHub Issues](https://github.com/danish007dev/mediguard-mcp/issues)
 - **Email**: your.email@example.com
 
 ---
@@ -469,6 +581,6 @@ This software is provided for informational purposes only and should not be used
 
 **🛡️ Preventing medication errors, one interaction at a time.**
 
-[View Demo](https://youtube.com/your-demo) • [Read Docs](docs/API.md) • [Try It Now](https://promptopinion.ai/marketplace)
+[View Demo](https://youtube.com/your-demo) • [Read Docs](docs/API_REFERENCE.md) • [Try It Now](https://promptopinion.ai/marketplace)
 
 </div>

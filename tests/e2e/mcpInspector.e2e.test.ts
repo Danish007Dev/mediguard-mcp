@@ -13,6 +13,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 // ---------------------------------------------------------------------------
+// Global timeout — E2E calls hit real external APIs and can be slow
+// ---------------------------------------------------------------------------
+jest.setTimeout(60_000);
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -73,15 +78,21 @@ describe("check_drug_interactions", () => {
 
     if (isError(result)) {
       // RxNorm API may time out — that's an external issue, not a bug
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(textContent(result)).toMatch(/RXNORM_TIMEOUT|UPSTREAM/);
     } else {
       const s = structured(result);
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.riskLevel).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.interactions).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.requestId).toBeDefined();
+      /* eslint-disable jest/no-conditional-expect */
       expect(s.medications).toEqual(
         expect.arrayContaining(["warfarin", "ibuprofen"]),
       );
+      /* eslint-enable jest/no-conditional-expect */
     }
   });
 
@@ -455,16 +466,25 @@ describe("calculate_patient_safety_score", () => {
 
     if (isError(result)) {
       // RxNorm API may time out for large med lists — that's an external issue
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(textContent(result)).toMatch(/RXNORM_TIMEOUT|UPSTREAM/);
     } else {
       const s = structured(result);
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.score).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(typeof s.score).toBe("number");
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.grade).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.riskLevel).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.dashboardArtifact).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.deductions).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.interactionSummary).toBeDefined();
+      // eslint-disable-next-line jest/no-conditional-expect
       expect(s.medicationCount).toBe(6);
     }
   });
