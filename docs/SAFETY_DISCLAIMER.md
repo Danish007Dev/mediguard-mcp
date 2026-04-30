@@ -18,6 +18,7 @@ MediGuard provides clinical decision-support information only.
 - Use a human review checkpoint for high- or critical-risk results.
 - Confirm recommendations against institutional protocols and formulary constraints.
 - Re-run safety checks when medication lists, allergies, labs, or conditions change.
+- Decision traces and audit logs are redacted but should still be treated as sensitive data.
 
 ## Emergency Use
 

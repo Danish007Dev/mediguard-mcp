@@ -1,80 +1,44 @@
-# Tool 1 Implementation Guide (Current)
+# MediGuard Tooling Implementation Guide
 
-This guide documents the current production-oriented implementation for `check_drug_interactions`.
+This guide summarizes the production implementation for all MediGuard MCP tools and the services they depend on.
 
-## Architecture Summary
+## Tool Map
 
-1. **RxNorm client** for medication normalization and RxCUI mapping.
-2. **OpenFDA client** for label-based interaction and warning evidence.
-3. **Interaction service** for pairwise matching, severity scoring, and fallback clinical rules.
-4. **Synthesis service** with provider resilience:
-1. Groq primary
-1. Gemini fallback
-1. Rule-based summary as final degradation path
+- `check_drug_interactions` -> `src/tools/checkDrugInteractions.ts` -> RxNorm/OpenFDA/PubMed + `InteractionSynthesisService`
+- `analyze_polypharmacy` -> `src/tools/analyzePolypharmacy.ts` -> rule engine + `PolypharmacySynthesisService`
+- `check_contraindications` -> `src/tools/checkContraindications.ts` -> DailyMed + `ContraindicationSynthesisService`
+- `get_safer_alternatives` -> `src/tools/getSaferAlternatives.ts` -> `SaferAlternativesService` + synthesis
+- `explain_medication_safety` -> `src/tools/explainMedicationSafety.ts` -> template + synthesis
+- `calculate_patient_safety_score` -> `src/tools/calculatePatientSafetyScore.ts` -> `PatientSafetyScoreService`
+- `simulate_medication_change` -> `src/tools/simulateWhatIfMedicationChange.ts` -> `WhatIfSimulationService`
+- `get_decision_trace` -> `src/tools/getDecisionTrace.ts` -> `DecisionTraceService`
+- `get_decision_trace_dashboard` -> `src/tools/getDecisionTraceDashboard.ts` -> `DecisionTraceService`
 
-## Implemented Files
+## Shared Patterns
 
-- `src/clients/rxNormClient.ts`
-- `src/clients/openFdaClient.ts`
-- `src/clients/groqClient.ts`
-- `src/clients/geminiClient.ts`
-- `src/services/rxNormOpenFdaDrugInteractionService.ts`
-- `src/services/interactionSynthesisService.ts`
-- `src/tools/checkDrugInteractions.ts`
-- `src/tools/registerTools.ts`
+- Input/output schemas are defined with Zod and validated before returning MCP responses.
+- SHARP context hydration flows through `SharpContextFhirService` to resolve medications, allergies, and conditions.
+- Decision trace capture is invoked for all clinical tools to support explainability and dashboards.
+- LLM synthesis uses Groq primary, Gemini fallback, and rule-based degradation when providers are unavailable.
 
-## What This Covers
+## Data Sources and Providers
 
-### 1. Drug normalization (RxNorm)
-- Name to RxCUI lookups
-- Brand to generic mapping (`Tylenol -> acetaminophen -> 161`)
-- Typo handling via spelling suggestions and approximate term fallback
-- JSON first, XML fallback parsing
-- TTL cache for stable terms
+- RxNorm for normalization and RxCUI mapping
+- OpenFDA for interaction warnings and label evidence
+- DailyMed for contraindication and label evidence
+- PubMed for evidence enrichment
+- FHIR R4 for patient-linked medications, allergies, and conditions
 
-### 2. Interaction evidence retrieval (OpenFDA)
-- Brand or generic label search in one query
-- Parses both `drug_interactions` and `warnings_and_cautions`
-- Collects aliases for stronger matching
-- Handles API timeout and failure with structured errors
-- TTL cache for repeated lookups
+## Key Environment Variables
 
-### 3. Interaction inference
-- Pairwise matching of medications
-- Direct mention matching using aliases
-- Drug-class hint matching (e.g., anticoagulant, NSAID)
-- Severity classification from evidence language
-- Deterministic fallback rules for known high-risk pairs
+- `GROQ_API_KEY`, `GEMINI_API_KEY`
+- `RXNORM_API_URL`, `OPENFDA_API_URL`, `DAILYMED_API_URL`, `PUBMED_API_URL`
+- `FHIR_PAGE_SIZE`, `FHIR_MAX_PAGES`, `FHIR_DEFAULT_TOKEN_ENDPOINT`
+- `MCP_TRANSPORT`, `PORT`
+- `DECISION_TRACE_MAX_RECORDS`, `DECISION_TRACE_MAX_AGE_MS`, `DECISION_TRACE_ARCHIVE_PATH`
 
-### 4. Multi-provider synthesis
-- Groq is attempted first for concise clinical summary JSON
-- Gemini is automatically used if Groq fails/unavailable
-- Rule-based synthesis is used if both providers fail/unavailable
-- Output includes `analysisProvider` for transparency
+## Testing Pointers
 
-## Required Environment Variables
-
-```env
-RXNORM_API_URL=https://rxnav.nlm.nih.gov/REST
-OPENFDA_API_URL=https://api.fda.gov
-API_TIMEOUT_MS=5000
-DRUG_CACHE_TTL=86400
-
-GROQ_API_URL=https://api.groq.com/openai/v1
-GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
-
-GEMINI_API_URL=https://generativelanguage.googleapis.com/v1beta
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
-```
-
-## Next Tooling Step
-
-Proceed to Tool 2 `analyze_polypharmacy` with the same production patterns:
-
-1. Typed client/service boundaries
-2. Deterministic safety rules first
-3. Groq primary with Gemini fallback for synthesis
-4. Rule-based degradation path
-5. Contract-first MCP output schemas
+- Tool-level tests live under `tests/unit` and `tests/safety`.
+- Decision trace performance coverage is exercised via `npm run validate:feature4`.
+- Use `npm run inspect:dev` to validate tool contracts interactively.
