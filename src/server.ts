@@ -133,7 +133,7 @@ async function startHttpServer(): Promise<void> {
     }
 
     // Serve favicon for Claude Desktop and browsers
-    if (req.url === "/favicon.ico") {
+    if (req.url?.startsWith("/favicon.ico")) {
       try {
         const logoPath = path.join(process.cwd(), "assets", "logo.png");
         const logo = fs.readFileSync(logoPath);
