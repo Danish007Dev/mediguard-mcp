@@ -30,10 +30,27 @@ const sessions = new Map<
 async function createConnectedServer(
   transport: StreamableHTTPServerTransport,
 ): Promise<McpServer> {
-  const server = new McpServer({
-    name: env.MCP_SERVER_NAME,
-    version: env.MCP_SERVER_VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: env.MCP_SERVER_NAME,
+      version: env.MCP_SERVER_VERSION,
+    },
+    {
+      capabilities: {
+        extensions: {
+          "ai.promptopinion/fhir-context": {
+            scopes: [
+              { name: "patient/Patient.rs", required: true },
+              { name: "offline_access" },
+              { name: "patient/Observation.rs" },
+              { name: "patient/MedicationStatement.rs" },
+              { name: "patient/Condition.rs" },
+            ],
+          },
+        },
+      },
+    }
+  );
 
   registerTools(server, logger.child({ component: "tools" }));
   await server.connect(transport);
@@ -165,10 +182,27 @@ async function startHttpServer(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function startStdioServer(): Promise<void> {
-  const server = new McpServer({
-    name: env.MCP_SERVER_NAME,
-    version: env.MCP_SERVER_VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: env.MCP_SERVER_NAME,
+      version: env.MCP_SERVER_VERSION,
+    },
+    {
+      capabilities: {
+        extensions: {
+          "ai.promptopinion/fhir-context": {
+            scopes: [
+              { name: "patient/Patient.rs", required: true },
+              { name: "offline_access" },
+              { name: "patient/Observation.rs" },
+              { name: "patient/MedicationStatement.rs" },
+              { name: "patient/Condition.rs" },
+            ],
+          },
+        },
+      },
+    }
+  );
 
   registerTools(server, logger.child({ component: "tools" }));
 
