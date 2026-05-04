@@ -501,8 +501,8 @@ describe("calculate_patient_safety_score", () => {
     expect(isError(result)).toBe(false);
     const s = structured(result);
     expect(typeof s.score).toBe("number");
-    expect((s.score as number)).toBeGreaterThanOrEqual(0);
-    expect((s.score as number)).toBeLessThanOrEqual(100);
+    expect(s.score as number).toBeGreaterThanOrEqual(0);
+    expect(s.score as number).toBeLessThanOrEqual(100);
   });
 
   it("returns validation error for empty medications", async () => {

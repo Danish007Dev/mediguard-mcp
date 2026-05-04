@@ -49,7 +49,7 @@ async function createConnectedServer(
           },
         },
       },
-    }
+    },
   );
 
   registerTools(server, logger.child({ component: "tools" }));
@@ -156,7 +156,7 @@ async function startHttpServer(): Promise<void> {
         const logo = fs.readFileSync(logoPath);
         res.writeHead(200, {
           "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=86400"
+          "Cache-Control": "public, max-age=86400",
         });
         res.end(logo);
       } catch (err) {
@@ -201,7 +201,7 @@ async function startStdioServer(): Promise<void> {
           },
         },
       },
-    }
+    },
   );
 
   registerTools(server, logger.child({ component: "tools" }));

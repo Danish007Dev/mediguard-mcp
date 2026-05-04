@@ -63,56 +63,60 @@ describe("WhatIfSimulationService", () => {
 
   it("marks replacement as safer when score improves and risk is resolved", async () => {
     const interactionService = {
-      checkDrugInteractions: jest.fn().mockImplementation((medications: string[]) => {
-        if (medications.includes("acetaminophen")) {
+      checkDrugInteractions: jest
+        .fn()
+        .mockImplementation((medications: string[]) => {
+          if (medications.includes("acetaminophen")) {
+            return Promise.resolve(
+              buildInteractionResult({
+                medications,
+                interactions: [],
+              }),
+            );
+          }
+
           return Promise.resolve(
             buildInteractionResult({
               medications,
-              interactions: [],
+              interactions: [
+                {
+                  drugs: ["warfarin", "ibuprofen"],
+                  severity: "major",
+                  mechanism: "Bleeding",
+                  clinicalImpact: "Major bleed risk",
+                  recommendations: ["Avoid combination"],
+                  evidence: "label",
+                },
+              ],
             }),
           );
-        }
-
-        return Promise.resolve(
-          buildInteractionResult({
-            medications,
-            interactions: [
-              {
-                drugs: ["warfarin", "ibuprofen"],
-                severity: "major",
-                mechanism: "Bleeding",
-                clinicalImpact: "Major bleed risk",
-                recommendations: ["Avoid combination"],
-                evidence: "label",
-              },
-            ],
-          }),
-        );
-      }),
+        }),
     };
 
     const patientSafetyScoreService = {
-      calculateSafetyScore: jest.fn().mockImplementation((input: { currentMedications: string[] }) => {
-        if (input.currentMedications.includes("acetaminophen")) {
+      calculateSafetyScore: jest
+        .fn()
+        .mockImplementation((input: { currentMedications: string[] }) => {
+          if (input.currentMedications.includes("acetaminophen")) {
+            return Promise.resolve(
+              buildScoreResult({
+                score: 90,
+                grade: "A",
+                riskLevel: "low",
+                medicationCount: input.currentMedications.length,
+              }),
+            );
+          }
+
           return Promise.resolve(
             buildScoreResult({
-              score: 90,
-              grade: "A",
-              riskLevel: "low",
+              score: 75,
+              grade: "B",
+              riskLevel: "medium",
               medicationCount: input.currentMedications.length,
             }),
           );
-        }
-
-        return Promise.resolve(
-          buildScoreResult({
-            score: 75,
-            grade: "B",
-            riskLevel: "medium",
-            medicationCount: input.currentMedications.length,
-          }),
-        );
-      }),
+        }),
     };
 
     const service = new WhatIfSimulationService(
@@ -143,56 +147,60 @@ describe("WhatIfSimulationService", () => {
 
   it("marks add scenario as riskier when score declines and new risk appears", async () => {
     const interactionService = {
-      checkDrugInteractions: jest.fn().mockImplementation((medications: string[]) => {
-        if (medications.includes("aspirin")) {
+      checkDrugInteractions: jest
+        .fn()
+        .mockImplementation((medications: string[]) => {
+          if (medications.includes("aspirin")) {
+            return Promise.resolve(
+              buildInteractionResult({
+                medications,
+                interactions: [
+                  {
+                    drugs: ["warfarin", "aspirin"],
+                    severity: "major",
+                    mechanism: "Bleeding",
+                    clinicalImpact: "Major bleed risk",
+                    recommendations: ["Avoid overlap"],
+                    evidence: "label",
+                  },
+                ],
+              }),
+            );
+          }
+
           return Promise.resolve(
             buildInteractionResult({
               medications,
-              interactions: [
-                {
-                  drugs: ["warfarin", "aspirin"],
-                  severity: "major",
-                  mechanism: "Bleeding",
-                  clinicalImpact: "Major bleed risk",
-                  recommendations: ["Avoid overlap"],
-                  evidence: "label",
-                },
-              ],
+              interactions: [],
             }),
           );
-        }
-
-        return Promise.resolve(
-          buildInteractionResult({
-            medications,
-            interactions: [],
-          }),
-        );
-      }),
+        }),
     };
 
     const patientSafetyScoreService = {
-      calculateSafetyScore: jest.fn().mockImplementation((input: { currentMedications: string[] }) => {
-        if (input.currentMedications.includes("aspirin")) {
+      calculateSafetyScore: jest
+        .fn()
+        .mockImplementation((input: { currentMedications: string[] }) => {
+          if (input.currentMedications.includes("aspirin")) {
+            return Promise.resolve(
+              buildScoreResult({
+                score: 74,
+                grade: "C",
+                riskLevel: "high",
+                medicationCount: input.currentMedications.length,
+              }),
+            );
+          }
+
           return Promise.resolve(
             buildScoreResult({
-              score: 74,
-              grade: "C",
-              riskLevel: "high",
+              score: 92,
+              grade: "A",
+              riskLevel: "low",
               medicationCount: input.currentMedications.length,
             }),
           );
-        }
-
-        return Promise.resolve(
-          buildScoreResult({
-            score: 92,
-            grade: "A",
-            riskLevel: "low",
-            medicationCount: input.currentMedications.length,
-          }),
-        );
-      }),
+        }),
     };
 
     const service = new WhatIfSimulationService(

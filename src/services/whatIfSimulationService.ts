@@ -54,7 +54,10 @@ function applyProposedChange(
   }
 
   const existing = new Map(
-    currentMedications.map((medication) => [medication.toLowerCase(), medication]),
+    currentMedications.map((medication) => [
+      medication.toLowerCase(),
+      medication,
+    ]),
   );
 
   if (action === "add") {
@@ -186,51 +189,64 @@ export class WhatIfSimulationService {
       input.proposedChange,
     );
 
-    const scoreInputBase: Omit<CalculatePatientSafetyScoreInput, "currentMedications"> = {
+    const scoreInputBase: Omit<
+      CalculatePatientSafetyScoreInput,
+      "currentMedications"
+    > = {
       patientAge: input.patientAge,
       patientConditions,
     };
 
-    const [currentScore, proposedScore, currentInteractions, proposedInteractions] =
-      await Promise.all([
-        this.patientSafetyScoreService.calculateSafetyScore(
-          {
-            ...scoreInputBase,
-            currentMedications,
-          },
-          `${requestId}-current-score`,
-        ),
-        this.patientSafetyScoreService.calculateSafetyScore(
-          {
-            ...scoreInputBase,
-            currentMedications: proposedMedications,
-          },
-          `${requestId}-proposed-score`,
-        ),
-        this.interactionService.checkDrugInteractions(
+    const [
+      currentScore,
+      proposedScore,
+      currentInteractions,
+      proposedInteractions,
+    ] = await Promise.all([
+      this.patientSafetyScoreService.calculateSafetyScore(
+        {
+          ...scoreInputBase,
           currentMedications,
-          `${requestId}-current-risks`,
-          {
-            age: input.patientAge,
-            conditions: patientConditions,
-          },
-        ),
-        this.interactionService.checkDrugInteractions(
-          proposedMedications,
-          `${requestId}-proposed-risks`,
-          {
-            age: input.patientAge,
-            conditions: patientConditions,
-          },
-        ),
-      ]);
+        },
+        `${requestId}-current-score`,
+      ),
+      this.patientSafetyScoreService.calculateSafetyScore(
+        {
+          ...scoreInputBase,
+          currentMedications: proposedMedications,
+        },
+        `${requestId}-proposed-score`,
+      ),
+      this.interactionService.checkDrugInteractions(
+        currentMedications,
+        `${requestId}-current-risks`,
+        {
+          age: input.patientAge,
+          conditions: patientConditions,
+        },
+      ),
+      this.interactionService.checkDrugInteractions(
+        proposedMedications,
+        `${requestId}-proposed-risks`,
+        {
+          age: input.patientAge,
+          conditions: patientConditions,
+        },
+      ),
+    ]);
 
     const currentRiskMap = new Map(
-      currentInteractions.interactions.map((item) => [toInteractionKey(item), item]),
+      currentInteractions.interactions.map((item) => [
+        toInteractionKey(item),
+        item,
+      ]),
     );
 
     const proposedRiskMap = new Map(
-      proposedInteractions.interactions.map((item) => [toInteractionKey(item), item]),
+      proposedInteractions.interactions.map((item) => [
+        toInteractionKey(item),
+        item,
+      ]),
     );
 
     const newRisks = proposedInteractions.interactions.filter(
@@ -243,7 +259,8 @@ export class WhatIfSimulationService {
 
     const scoreDelta = proposedScore.score - currentScore.score;
     const interactionDelta =
-      proposedInteractions.interactions.length - currentInteractions.interactions.length;
+      proposedInteractions.interactions.length -
+      currentInteractions.interactions.length;
 
     const recommendation =
       scoreDelta > 0 || (scoreDelta === 0 && interactionDelta < 0)

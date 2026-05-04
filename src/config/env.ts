@@ -29,15 +29,13 @@ const envSchema = z.object({
     .default("https://eutils.ncbi.nlm.nih.gov/entrez/eutils"),
   PUBMED_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
   PUBMED_MAX_RETRIES: z.coerce.number().int().min(0).max(8).default(4),
-  PUBMED_CIRCUIT_BREAKER_FAILURE_THRESHOLD: z
-    .coerce
+  PUBMED_CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce
     .number()
     .int()
     .min(1)
     .max(20)
     .default(5),
-  PUBMED_CIRCUIT_BREAKER_COOLDOWN_MS: z
-    .coerce
+  PUBMED_CIRCUIT_BREAKER_COOLDOWN_MS: z.coerce
     .number()
     .int()
     .positive()
@@ -59,7 +57,11 @@ const envSchema = z.object({
   API_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
   DRUG_CACHE_TTL: z.coerce.number().int().positive().default(86400),
   DECISION_TRACE_MAX_RECORDS: z.coerce.number().int().positive().default(1000),
-  DECISION_TRACE_MAX_AGE_MS: z.coerce.number().int().positive().default(86400000),
+  DECISION_TRACE_MAX_AGE_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(86400000),
   DECISION_TRACE_ARCHIVE_PATH: optionalString,
   MCP_TRANSPORT: z.enum(["stdio", "http"]).default("stdio"),
   PORT: z.coerce.number().int().positive().default(3000),

@@ -54,7 +54,8 @@ describe("Feature 4 decision trace performance baseline", () => {
 
       service.startTrace({
         requestId,
-        toolName: index % 2 === 0 ? "check_drug_interactions" : "analyze_polypharmacy",
+        toolName:
+          index % 2 === 0 ? "check_drug_interactions" : "analyze_polypharmacy",
         inputSummary: { medicationCount: 3 },
       });
 

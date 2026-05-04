@@ -149,9 +149,10 @@ function buildPrompt(input: ContraindicationSynthesisInput): {
  * Provider-fallback synthesis service for contraindication summary generation.
  */
 export class ContraindicationSynthesisService {
-  private readonly cache = new TtlCache<string, ContraindicationSynthesisCoreResult>(
-    10 * 60 * 1000,
-  );
+  private readonly cache = new TtlCache<
+    string,
+    ContraindicationSynthesisCoreResult
+  >(10 * 60 * 1000);
   private readonly observability: LlmSynthesisObservability;
 
   public constructor(

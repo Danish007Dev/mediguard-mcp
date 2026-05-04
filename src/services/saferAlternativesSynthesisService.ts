@@ -98,7 +98,9 @@ function toCacheKey(input: SaferAlternativesSynthesisInput): string {
   const normalized = {
     proposedMedication: input.proposedMedication.toLowerCase(),
     riskLevel: input.riskLevel,
-    riskContext: [...input.riskContext].map((item) => item.toLowerCase()).sort(),
+    riskContext: [...input.riskContext]
+      .map((item) => item.toLowerCase())
+      .sort(),
     alternatives: input.alternatives.map((option) => ({
       medication: option.medication.toLowerCase(),
       therapeuticClass: option.therapeuticClass,
@@ -134,9 +136,10 @@ function buildPrompt(input: SaferAlternativesSynthesisInput): {
  * Provider-fallback synthesis service for safer-alternative summaries.
  */
 export class SaferAlternativesSynthesisService {
-  private readonly cache = new TtlCache<string, SaferAlternativesSynthesisCoreResult>(
-    10 * 60 * 1000,
-  );
+  private readonly cache = new TtlCache<
+    string,
+    SaferAlternativesSynthesisCoreResult
+  >(10 * 60 * 1000);
   private readonly observability: LlmSynthesisObservability;
 
   public constructor(

@@ -156,19 +156,21 @@ function inferOverallRisk(
 function toPromptRawInteractions(
   interactions: InteractionFinding[],
 ): PromptRawInteraction[] {
-  return interactions.slice(0, MAX_INTERACTIONS_FOR_PROMPT).map((interaction) => {
-    const drug1 = interaction.drugs[0] ?? "unknown";
-    const drug2 = interaction.drugs[1] ?? "unknown";
+  return interactions
+    .slice(0, MAX_INTERACTIONS_FOR_PROMPT)
+    .map((interaction) => {
+      const drug1 = interaction.drugs[0] ?? "unknown";
+      const drug2 = interaction.drugs[1] ?? "unknown";
 
-    return {
-      drug1,
-      drug2,
-      severity_code: interaction.severity,
-      description: normalizeWhitespace(
-        `${interaction.mechanism}. ${interaction.clinicalImpact}`,
-      ).slice(0, 600),
-    };
-  });
+      return {
+        drug1,
+        drug2,
+        severity_code: interaction.severity,
+        description: normalizeWhitespace(
+          `${interaction.mechanism}. ${interaction.clinicalImpact}`,
+        ).slice(0, 600),
+      };
+    });
 }
 
 function buildPatientContextSummary(
@@ -231,8 +233,7 @@ function buildRuleBasedSummary(
   if (input.interactions.length === 0) {
     return {
       provider: "rule-based",
-      summary:
-        `No interaction evidence met rule thresholds. Continue routine medication safety review. ${patientContextText}`,
+      summary: `No interaction evidence met rule thresholds. Continue routine medication safety review. ${patientContextText}`,
       recommendations: [
         "Continue standard monitoring and reassess if medication changes occur.",
         "Recheck interactions if new prescriptions are added.",
@@ -325,13 +326,17 @@ function buildPrompt(input: InteractionSynthesisInput): {
 function toCacheKey(input: InteractionSynthesisInput): string {
   const rawInteractions = toPromptRawInteractions(input.interactions);
   const normalized = {
-    medications: toUniqueList(input.medications.map((item) => item.toLowerCase())),
+    medications: toUniqueList(
+      input.medications.map((item) => item.toLowerCase()),
+    ),
     rawInteractions,
     riskLevel: input.riskLevel,
     patientContext: {
       age: input.patientContext?.age,
       conditions: toUniqueList(
-        (input.patientContext?.conditions ?? []).map((item) => item.toLowerCase()),
+        (input.patientContext?.conditions ?? []).map((item) =>
+          item.toLowerCase(),
+        ),
       ),
       renalFunction: input.patientContext?.renalFunction ?? "",
     },
@@ -409,9 +414,7 @@ export class InteractionSynthesisService {
   private readonly synthesisCache = new TtlCache<
     string,
     InteractionSynthesisCoreResult
-  >(
-    10 * 60 * 1000,
-  );
+  >(10 * 60 * 1000);
   private totalRequests = 0;
   private cacheHits = 0;
   private readonly providerCalls: ProviderCallCounters = {
@@ -482,7 +485,10 @@ export class InteractionSynthesisService {
     };
   }
 
-  private logTrace(trace: InteractionLlmTrace, telemetry: InteractionLlmTelemetry): void {
+  private logTrace(
+    trace: InteractionLlmTrace,
+    telemetry: InteractionLlmTelemetry,
+  ): void {
     this.logger.info("Interaction synthesis reasoning trace", {
       traceId: trace.traceId,
       cacheHit: trace.cacheHit,
@@ -504,7 +510,8 @@ export class InteractionSynthesisService {
     payload: unknown,
   ): void {
     const promptTokens =
-      estimateTokensFromText(prompt.system) + estimateTokensFromText(prompt.user);
+      estimateTokensFromText(prompt.system) +
+      estimateTokensFromText(prompt.user);
     const completionTokens = estimateTokensFromUnknown(payload);
     const totalTokens = promptTokens + completionTokens;
 

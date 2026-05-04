@@ -198,16 +198,16 @@ export async function executeSimulateWhatIfMedicationChange(
 
     const hydratedMedications =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveMedications(
+        ? ((await dependencies.sharpContextService.resolveMedications(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     const hydratedConditions =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveConditions(
+        ? ((await dependencies.sharpContextService.resolveConditions(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     const currentMedications = asUnique([

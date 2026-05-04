@@ -62,7 +62,8 @@ const SENSITIVE_KEY_PATTERN =
 
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const SSN_PATTERN = /\b\d{3}-\d{2}-\d{4}\b/;
-const PHONE_PATTERN = /(?:\+?\d{1,2}[\s-]?)?(?:\(?\d{3}\)?[\s-]?)\d{3}[\s-]?\d{4}\b/;
+const PHONE_PATTERN =
+  /(?:\+?\d{1,2}[\s-]?)?(?:\(?\d{3}\)?[\s-]?)\d{3}[\s-]?\d{4}\b/;
 
 function percentile(values: number[], percentileRank: number): number {
   if (values.length === 0) {
@@ -75,7 +76,11 @@ function percentile(values: number[], percentileRank: number): number {
 }
 
 function sanitizeString(value: string): string {
-  if (EMAIL_PATTERN.test(value) || SSN_PATTERN.test(value) || PHONE_PATTERN.test(value)) {
+  if (
+    EMAIL_PATTERN.test(value) ||
+    SSN_PATTERN.test(value) ||
+    PHONE_PATTERN.test(value)
+  ) {
     return REDACTED;
   }
 
@@ -113,7 +118,9 @@ function sanitizeUnknown(value: unknown, keyHint?: string): unknown {
   return value;
 }
 
-function sanitizeRecord(record: Record<string, unknown>): Record<string, unknown> {
+function sanitizeRecord(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
   return sanitizeUnknown(record) as Record<string, unknown>;
 }
 
@@ -252,7 +259,9 @@ export class DecisionTraceService {
       .filter((item): item is DecisionTraceRecord => Boolean(item));
 
     return ordered
-      .filter((trace) => (input.toolName ? trace.toolName === input.toolName : true))
+      .filter((trace) =>
+        input.toolName ? trace.toolName === input.toolName : true,
+      )
       .filter((trace) => (input.status ? trace.status === input.status : true))
       .slice(0, limit);
   }
@@ -268,17 +277,22 @@ export class DecisionTraceService {
     );
     const limit = Math.min(100, Math.max(1, input.limit ?? 20));
 
-    const cutoffIso = new Date(this.nowProvider() - windowMinutes * 60 * 1000)
-      .toISOString();
+    const cutoffIso = new Date(
+      this.nowProvider() - windowMinutes * 60 * 1000,
+    ).toISOString();
 
     const traces = [...this.traceOrder]
       .reverse()
       .map((requestId) => this.traces.get(requestId))
       .filter((item): item is DecisionTraceRecord => Boolean(item))
       .filter((trace) => trace.finishedAt >= cutoffIso)
-      .filter((trace) => (input.toolName ? trace.toolName === input.toolName : true));
+      .filter((trace) =>
+        input.toolName ? trace.toolName === input.toolName : true,
+      );
 
-    const successCount = traces.filter((trace) => trace.status === "success").length;
+    const successCount = traces.filter(
+      (trace) => trace.status === "success",
+    ).length;
     const errorCount = traces.length - successCount;
     const successRate = traces.length > 0 ? successCount / traces.length : 0;
 
@@ -294,8 +308,12 @@ export class DecisionTraceService {
 
     const toolBreakdown: DecisionTraceToolBreakdown[] = [...byTool.entries()]
       .map(([toolName, toolTraces]) => {
-        const durations = toolTraces.map((trace) => computeTotalDurationMs(trace));
-        const toolSuccess = toolTraces.filter((trace) => trace.status === "success").length;
+        const durations = toolTraces.map((trace) =>
+          computeTotalDurationMs(trace),
+        );
+        const toolSuccess = toolTraces.filter(
+          (trace) => trace.status === "success",
+        ).length;
 
         return {
           toolName,
@@ -304,7 +322,10 @@ export class DecisionTraceService {
           errorCount: toolTraces.length - toolSuccess,
           averageDurationMs:
             toolTraces.length > 0
-              ? Math.round(durations.reduce((sum, ms) => sum + ms, 0) / toolTraces.length)
+              ? Math.round(
+                  durations.reduce((sum, ms) => sum + ms, 0) /
+                    toolTraces.length,
+                )
               : 0,
           p95DurationMs: percentile(durations, 0.95),
           lastSeenAt: toolTraces[0]?.finishedAt ?? new Date(0).toISOString(),
@@ -312,16 +333,18 @@ export class DecisionTraceService {
       })
       .sort((left, right) => right.total - left.total);
 
-    const recentTraces: DecisionTraceRecentItem[] = traces.slice(0, limit).map((trace) => ({
-      requestId: trace.requestId,
-      toolName: trace.toolName,
-      status: trace.status,
-      startedAt: trace.startedAt,
-      finishedAt: trace.finishedAt,
-      totalDurationMs: computeTotalDurationMs(trace),
-      stepCount: trace.steps.length,
-      errorCode: trace.error?.code,
-    }));
+    const recentTraces: DecisionTraceRecentItem[] = traces
+      .slice(0, limit)
+      .map((trace) => ({
+        requestId: trace.requestId,
+        toolName: trace.toolName,
+        status: trace.status,
+        startedAt: trace.startedAt,
+        finishedAt: trace.finishedAt,
+        totalDurationMs: computeTotalDurationMs(trace),
+        stepCount: trace.steps.length,
+        errorCode: trace.error?.code,
+      }));
 
     return {
       generatedAt: this.nowIso(),
@@ -403,7 +426,9 @@ export class DecisionTraceService {
 
     try {
       const file = readFileSync(this.archivePath, "utf8");
-      const lines = file.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      const lines = file
+        .split(/\r?\n/)
+        .filter((line) => line.trim().length > 0);
 
       for (const line of lines) {
         try {

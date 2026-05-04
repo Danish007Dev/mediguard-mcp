@@ -193,14 +193,15 @@ export class PatientSafetyScoreService {
       );
     }
 
-    const interactionResult = await this.interactionService.checkDrugInteractions(
-      medications,
-      requestId,
-      {
-        age: input.patientAge,
-        conditions,
-      },
-    );
+    const interactionResult =
+      await this.interactionService.checkDrugInteractions(
+        medications,
+        requestId,
+        {
+          age: input.patientAge,
+          conditions,
+        },
+      );
 
     const contraindicatedCount = interactionResult.interactions.filter(
       (finding) => finding.severity === "contraindicated",
@@ -218,7 +219,8 @@ export class PatientSafetyScoreService {
     const deductions: SafetyScoreDeduction[] = [];
 
     const interactionPoints = interactionResult.interactions.reduce(
-      (total, interaction) => total + pointsForInteractionSeverity(interaction.severity),
+      (total, interaction) =>
+        total + pointsForInteractionSeverity(interaction.severity),
       0,
     );
 
@@ -231,7 +233,8 @@ export class PatientSafetyScoreService {
       });
     }
 
-    const polypharmacyPoints = medications.length > 10 ? (medications.length - 10) * 2 : 0;
+    const polypharmacyPoints =
+      medications.length > 10 ? (medications.length - 10) * 2 : 0;
     if (polypharmacyPoints > 0) {
       deductions.push({
         category: "Polypharmacy burden",
@@ -252,9 +255,8 @@ export class PatientSafetyScoreService {
       });
     }
 
-    const duplicateTherapeuticClasses = this.getDuplicateTherapeuticClassFlags(
-      medications,
-    );
+    const duplicateTherapeuticClasses =
+      this.getDuplicateTherapeuticClassFlags(medications);
     const duplicatePoints = duplicateTherapeuticClasses.length * 5;
     if (duplicatePoints > 0) {
       deductions.push({
@@ -413,7 +415,8 @@ export class PatientSafetyScoreService {
         interactionFindings[0]?.recommendations[0] ??
         "Review high-risk combinations and adjust treatment where feasible.";
       const expectedPointsGain = interactionFindings.reduce(
-        (total, finding) => total + pointsForInteractionSeverity(finding.severity),
+        (total, finding) =>
+          total + pointsForInteractionSeverity(finding.severity),
         0,
       );
 

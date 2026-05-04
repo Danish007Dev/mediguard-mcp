@@ -143,7 +143,9 @@ export const calculatePatientSafetyScoreOutputSchema = {
 const inputObjectSchema = z.object(calculatePatientSafetyScoreInputSchema);
 const outputObjectSchema = z.object(calculatePatientSafetyScoreOutputSchema);
 
-export type CalculatePatientSafetyScoreInput = z.infer<typeof inputObjectSchema>;
+export type CalculatePatientSafetyScoreInput = z.infer<
+  typeof inputObjectSchema
+>;
 
 interface PatientSafetyScoreService {
   calculateSafetyScore(
@@ -199,7 +201,9 @@ function buildResponseText(result: PatientSafetyScoreResult): string {
     );
   }
 
-  lines.push(`Potential optimized score: ${result.potentialOptimizedScore}/100`);
+  lines.push(
+    `Potential optimized score: ${result.potentialOptimizedScore}/100`,
+  );
 
   return lines.join("\n");
 }
@@ -215,7 +219,10 @@ function buildDashboardArtifact(
       grade: result.grade,
       riskLevel: result.riskLevel,
       potentialOptimizedScore: result.potentialOptimizedScore,
-      optimizationGap: Math.max(0, result.potentialOptimizedScore - result.score),
+      optimizationGap: Math.max(
+        0,
+        result.potentialOptimizedScore - result.score,
+      ),
       medicationCount: result.medicationCount,
     },
     severityChart: [
@@ -283,16 +290,16 @@ export async function executeCalculatePatientSafetyScore(
 
     const hydratedMedications =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveMedications(
+        ? ((await dependencies.sharpContextService.resolveMedications(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     const hydratedConditions =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveConditions(
+        ? ((await dependencies.sharpContextService.resolveConditions(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     const currentMedications = asUnique([

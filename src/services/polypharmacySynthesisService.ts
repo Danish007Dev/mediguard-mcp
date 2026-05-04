@@ -142,9 +142,10 @@ function buildPrompt(input: PolypharmacySynthesisInput): {
  * Provider-fallback synthesis service for polypharmacy summaries.
  */
 export class PolypharmacySynthesisService {
-  private readonly cache = new TtlCache<string, PolypharmacySynthesisCoreResult>(
-    10 * 60 * 1000,
-  );
+  private readonly cache = new TtlCache<
+    string,
+    PolypharmacySynthesisCoreResult
+  >(10 * 60 * 1000);
   private readonly observability: LlmSynthesisObservability;
 
   public constructor(

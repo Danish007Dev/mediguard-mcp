@@ -43,7 +43,9 @@ export const checkDrugInteractionsInputSchema = {
   patient_context: z
     .union([patientContextInputSchema, z.object({}).passthrough()])
     .optional()
-    .describe("Optional patient context for LLM-adapted interaction reasoning."),
+    .describe(
+      "Optional patient context for LLM-adapted interaction reasoning.",
+    ),
 };
 
 export const checkDrugInteractionsOutputSchema = {
@@ -126,9 +128,7 @@ export const checkDrugInteractionsOutputSchema = {
         .object({
           traceId: z.string().uuid(),
           cacheHit: z.boolean(),
-          attemptedProviders: z.array(
-            z.enum(["groq", "gemini", "rule-based"]),
-          ),
+          attemptedProviders: z.array(z.enum(["groq", "gemini", "rule-based"])),
           selectedProvider: z.enum(["groq", "gemini", "rule-based"]),
           fallbackUsed: z.boolean(),
           promptInteractionCount: z.number().int().nonnegative(),
@@ -250,16 +250,16 @@ export async function executeCheckDrugInteractions(
 
     const hydratedMedications =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveMedications(
+        ? ((await dependencies.sharpContextService.resolveMedications(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     const hydratedConditions =
       sharpContext && dependencies.sharpContextService
-        ? (await dependencies.sharpContextService.resolveConditions(
+        ? ((await dependencies.sharpContextService.resolveConditions(
             sharpContext,
-          )) ?? []
+          )) ?? [])
         : [];
 
     dependencies.traceService?.addStep({
@@ -277,9 +277,9 @@ export async function executeCheckDrugInteractions(
 
     const medications = asUnique([...args.medications, ...hydratedMedications]);
 
-    const inputPatientContext = patientContextInputSchema
-      .safeParse(args.patient_context)
-      .success
+    const inputPatientContext = patientContextInputSchema.safeParse(
+      args.patient_context,
+    ).success
       ? patientContextInputSchema.parse(args.patient_context)
       : undefined;
 

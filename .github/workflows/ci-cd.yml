@@ -28,7 +28,7 @@ jobs:
       
       - name: Check for hardcoded credentials
         run: |
-          if grep -r "sk-ant-" . --exclude-dir=node_modules --exclude-dir=.git; then
+          if grep -r "sk-ant-" . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.github; then
             echo "❌ Found hardcoded API keys!"
             exit 1
           fi

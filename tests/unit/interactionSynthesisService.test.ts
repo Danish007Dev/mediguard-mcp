@@ -147,7 +147,8 @@ describe("InteractionSynthesisService", () => {
       isConfigured: jest.fn().mockReturnValue(true),
       generateStructuredJson: jest.fn().mockResolvedValue({
         overallRisk: "high",
-        contextualizedSummary: "Invalid because safer alternatives are missing.",
+        contextualizedSummary:
+          "Invalid because safer alternatives are missing.",
         recommendations: ["Monitor closely"],
         interactionAnalyses: [
           {
@@ -177,7 +178,9 @@ describe("InteractionSynthesisService", () => {
     const result = await service.synthesize(input);
 
     expect(result.provider).toBe("rule-based");
-    expect(result.interactionAnalyses[0]?.saferAlternatives.length).toBeGreaterThan(0);
+    expect(
+      result.interactionAnalyses[0]?.saferAlternatives.length,
+    ).toBeGreaterThan(0);
     expect(result.trace.selectedProvider).toBe("rule-based");
   });
 

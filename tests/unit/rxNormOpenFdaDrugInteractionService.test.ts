@@ -56,8 +56,9 @@ describe("RxNormOpenFdaDrugInteractionService", () => {
 
     const pubMedClient = options?.pubMedImplementation
       ? {
-          getInteractionEvidence: jest.fn(async (drug1: string, drug2: string) =>
-            options.pubMedImplementation?.(drug1, drug2),
+          getInteractionEvidence: jest.fn(
+            async (drug1: string, drug2: string) =>
+              options.pubMedImplementation?.(drug1, drug2),
           ),
         }
       : undefined;

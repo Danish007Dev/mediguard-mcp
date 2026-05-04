@@ -110,7 +110,10 @@ export async function executeGetDecisionTraceDashboard(
       structuredContent: validated,
     };
   } catch (error) {
-    const appError = toAppError(error, "Unable to fetch decision trace dashboard.");
+    const appError = toAppError(
+      error,
+      "Unable to fetch decision trace dashboard.",
+    );
 
     toolLogger.error("Decision trace dashboard retrieval failed", {
       code: appError.code,

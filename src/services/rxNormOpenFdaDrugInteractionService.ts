@@ -366,9 +366,8 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
       mapLlmRiskToRiskLevel(synthesis.overallRisk),
     );
 
-    const evidenceSummaries = await this.getPubMedEvidenceSummaries(
-      mergedInteractions,
-    );
+    const evidenceSummaries =
+      await this.getPubMedEvidenceSummaries(mergedInteractions);
 
     const llmSynthesis: InteractionLlmSynthesis = {
       overallRisk: synthesis.overallRisk,
@@ -647,11 +646,14 @@ export class RxNormOpenFdaDrugInteractionService implements DrugInteractionServi
         try {
           return await pubMedClient.getInteractionEvidence(drug1, drug2);
         } catch (error) {
-          this.logger.warn("PubMed evidence lookup failed for interaction pair", {
-            drug1,
-            drug2,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          this.logger.warn(
+            "PubMed evidence lookup failed for interaction pair",
+            {
+              drug1,
+              drug2,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
 
           return null;
         }

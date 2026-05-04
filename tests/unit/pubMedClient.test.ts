@@ -43,11 +43,11 @@ describe("PubMedClient", () => {
   it("throws validation error for empty drug names", async () => {
     const client = createClient();
 
-    await expect(client.getInteractionEvidence("", "ibuprofen")).rejects.toMatchObject(
-      {
-        code: "VALIDATION_ERROR",
-      },
-    );
+    await expect(
+      client.getInteractionEvidence("", "ibuprofen"),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
   });
 
   it("returns normalized evidence summary from esearch/esummary payloads", async () => {
@@ -333,7 +333,8 @@ describe("PubMedClient", () => {
             result: {
               uids: ["22222"],
               "22222": {
-                title: "Case report of severe interaction in outpatient setting",
+                title:
+                  "Case report of severe interaction in outpatient setting",
                 source: "Case Medicine",
                 pubdate: "2021",
               },

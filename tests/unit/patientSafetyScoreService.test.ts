@@ -79,9 +79,9 @@ describe("PatientSafetyScoreService", () => {
     );
 
     expect(result.score).toBeLessThan(100);
-    expect(result.deductions.some((item) => item.category === "Drug interactions")).toBe(
-      true,
-    );
+    expect(
+      result.deductions.some((item) => item.category === "Drug interactions"),
+    ).toBe(true);
     expect(
       result.deductions.some((item) => item.category === "Polypharmacy burden"),
     ).toBe(true);
@@ -237,7 +237,9 @@ describe("PatientSafetyScoreService", () => {
     );
 
     expect(result.medicationCount).toBe(32);
-    expect(result.deductions.some((item) => item.category === "Polypharmacy burden")).toBe(true);
+    expect(
+      result.deductions.some((item) => item.category === "Polypharmacy burden"),
+    ).toBe(true);
   });
 
   it("caps potential optimized score at 100", async () => {
@@ -282,5 +284,4 @@ describe("PatientSafetyScoreService", () => {
 
     expect(result.potentialOptimizedScore).toBeLessThanOrEqual(100);
   });
-
 });

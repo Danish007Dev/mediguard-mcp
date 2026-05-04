@@ -83,7 +83,9 @@ describe("calculate_patient_safety_score tool", () => {
 
     expect(structured.dashboardArtifact).toBeDefined();
     expect(structured.dashboardArtifact?.scoreCard.score).toBe(82);
-    expect(structured.dashboardArtifact?.scoreCard.potentialOptimizedScore).toBe(97);
+    expect(
+      structured.dashboardArtifact?.scoreCard.potentialOptimizedScore,
+    ).toBe(97);
     expect(structured.dashboardArtifact?.scoreCard.optimizationGap).toBe(15);
     expect(structured.dashboardArtifact?.severityChart).toEqual([
       { severity: "contraindicated", count: 0 },

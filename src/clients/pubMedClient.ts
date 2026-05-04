@@ -44,13 +44,19 @@ function asStringArray(value: unknown): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-function evidenceLevelFromStudies(studies: PubMedStudyReference[]): "A" | "B" | "C" | "D" {
+function evidenceLevelFromStudies(
+  studies: PubMedStudyReference[],
+): "A" | "B" | "C" | "D" {
   const combined = studies
     .flatMap((study) => [study.title, study.journal])
     .join(" ")
     .toLowerCase();
 
-  if (/(meta-analysis|systematic review|randomized|randomised|trial)/.test(combined)) {
+  if (
+    /(meta-analysis|systematic review|randomized|randomised|trial)/.test(
+      combined,
+    )
+  ) {
     return "A";
   }
 
@@ -72,7 +78,10 @@ function confidenceFromCount(studyCount: number): number {
 }
 
 function pairKey(drug1: string, drug2: string): string {
-  return [normalizeWhitespace(drug1).toLowerCase(), normalizeWhitespace(drug2).toLowerCase()]
+  return [
+    normalizeWhitespace(drug1).toLowerCase(),
+    normalizeWhitespace(drug2).toLowerCase(),
+  ]
     .sort()
     .join("::");
 }
@@ -91,7 +100,10 @@ function shouldRetryStatus(status: number): boolean {
  * Lightweight PubMed E-Utilities client for drug-pair evidence retrieval.
  */
 export class PubMedClient {
-  private readonly cache: TtlCache<string, PubMedInteractionEvidenceSummary | null>;
+  private readonly cache: TtlCache<
+    string,
+    PubMedInteractionEvidenceSummary | null
+  >;
   private readonly maxRetries: number;
   private readonly toolName: string;
   private readonly contactEmail?: string;
@@ -110,7 +122,9 @@ export class PubMedClient {
     this.contactEmail = config.contactEmail
       ? normalizeWhitespace(config.contactEmail)
       : undefined;
-    this.apiKey = config.apiKey ? normalizeWhitespace(config.apiKey) : undefined;
+    this.apiKey = config.apiKey
+      ? normalizeWhitespace(config.apiKey)
+      : undefined;
     this.circuitBreakerFailureThreshold = Math.max(
       1,
       config.circuitBreakerFailureThreshold ?? 5,
@@ -188,13 +202,17 @@ export class PubMedClient {
       sort: "relevance",
     });
 
-    const searchResult = isRecord(payload) ? payload["esearchresult"] : undefined;
+    const searchResult = isRecord(payload)
+      ? payload["esearchresult"]
+      : undefined;
     const idList = isRecord(searchResult) ? searchResult["idlist"] : undefined;
 
     return asStringArray(idList);
   }
 
-  private async fetchStudySummaries(pmids: string[]): Promise<PubMedStudyReference[]> {
+  private async fetchStudySummaries(
+    pmids: string[],
+  ): Promise<PubMedStudyReference[]> {
     const payload = await this.request("esummary.fcgi", {
       db: "pubmed",
       id: pmids.join(","),
@@ -286,10 +304,7 @@ export class PubMedClient {
         });
 
         if (!response.ok) {
-          if (
-            shouldRetryStatus(response.status) &&
-            attempt < this.maxRetries
-          ) {
+          if (shouldRetryStatus(response.status) && attempt < this.maxRetries) {
             const delayMs = 150 * 2 ** attempt;
             this.config.logger.warn(
               "Transient PubMed response status. Retrying request.",
@@ -385,10 +400,14 @@ export class PubMedClient {
       }
     }
 
-    throw new AppError("PubMed request exhausted retries.", "PUBMED_API_ERROR", {
-      endpoint,
-      retries: this.maxRetries,
-    });
+    throw new AppError(
+      "PubMed request exhausted retries.",
+      "PUBMED_API_ERROR",
+      {
+        endpoint,
+        retries: this.maxRetries,
+      },
+    );
   }
 
   private isCircuitOpen(): boolean {
