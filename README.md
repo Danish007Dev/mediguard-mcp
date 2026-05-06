@@ -346,6 +346,8 @@ All data sources are **public APIs** - no proprietary databases required.
 └─────────────────────────────────────────────────┘
 ```
 
+![MediGuard MCP tool workflow diagram](assets/MCP%20Tool%20Working%20Diagram.png)
+
 ---
 
 ## 📖 Integration Examples
