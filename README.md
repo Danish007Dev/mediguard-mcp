@@ -5,7 +5,6 @@
 </p>
 
 [![CI/CD](https://github.com/danish007dev/mediguard-mcp/workflows/CI%2FCD/badge.svg)](https://github.com/danish007dev/mediguard-mcp/actions)
-[![Test Coverage](https://codecov.io/gh/danish007dev/mediguard-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/danish007dev/mediguard-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **An intelligent MCP server that prevents medication errors through AI-powered drug interaction checking, polypharmacy analysis, and contraindication detection.**
@@ -565,7 +564,7 @@ Built for the **Agents Assemble Healthcare AI Hackathon** by [Prompt Opinion](ht
 - **Demo Video**: [YouTube Link]
 - **Devpost**: [Hackathon Submission]
 - **Issues**: [GitHub Issues](https://github.com/danish007dev/mediguard-mcp/issues)
-- **Email**: your.email@example.com
+- **Email**: contact@danishsolutions.dev
 
 ---
 
@@ -581,6 +580,6 @@ This software is provided for informational purposes only and should not be used
 
 **🛡️ Preventing medication errors, one interaction at a time.**
 
-[View Demo](https://youtube.com/your-demo) • [Read Docs](docs/API_REFERENCE.md) • [Try It Now](https://promptopinion.ai/marketplace)
+[View Demo](https://youtu.be/roVtarkS-gY) • [Read Docs](docs/API_REFERENCE.md) • [Try It Now](https://app.promptopinion.ai/marketplace/mcp/019dee9d-6a14-719a-8f30-4c24477e6a48)
 
 </div>
