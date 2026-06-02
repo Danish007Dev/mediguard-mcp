@@ -58,7 +58,7 @@ async function createConnectedServer(
 }
 
 // ---------------------------------------------------------------------------
-// HTTP mode: StreamableHTTPServerTransport (for Railway / Claude remote)
+// HTTP mode: StreamableHTTPServerTransport (for Render / Claude remote)
 // ---------------------------------------------------------------------------
 
 async function startHttpServer(): Promise<void> {
@@ -78,7 +78,7 @@ async function startHttpServer(): Promise<void> {
       return;
     }
 
-    // Health check for Railway
+    // Health check for Render
     if (req.url === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
