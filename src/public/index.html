@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediGuard MCP — AI-Powered Medication Safety Intelligence</title>
+  <meta name="description" content="A state-of-the-art Model Context Protocol (MCP) server for preventing adverse drug events, drug-drug interactions, and polypharmacy risks.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/index.css">
+  <link rel="icon" type="image/png" href="/favicon.ico">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="container header-container">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 12 12 22 12 22Z" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 12H15M12 9V15" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="logo-grad" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#06b6d4" />
+              <stop offset="1" stop-color="#10b981" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">MediGuard <span class="logo-badge">MCP</span></span>
+      </div>
+      <nav>
+        <a href="#playground" class="nav-link">Playground</a>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#integration" class="nav-link">Integration</a>
+        <a href="https://github.com/Danish007Dev/mediguard-mcp" target="_blank" class="github-btn">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+          </svg>
+          GitHub
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="container hero-container">
+      <div class="hero-content">
+        <h1 class="gradient-text">Clinical Decision Support for AI Agents</h1>
+        <p class="hero-subtitle">
+          MediGuard is a production-grade Model Context Protocol (MCP) server that empowers LLM agents to detect drug-drug interactions, beers criteria risks, and patient-specific contraindications in real-time.
+        </p>
+        
+        <div class="hero-cta-group">
+          <a href="#playground" class="btn btn-primary">Try the Sandbox</a>
+          <a href="#integration" class="btn btn-secondary">Get Connection URL</a>
+        </div>
+
+        <div class="quick-status">
+          <span class="status-indicator online"></span>
+          <span class="status-label">Active Remote Endpoint:</span>
+          <code id="mcp-endpoint-url">https://mediguard-mcp.onrender.com/mcp</code>
+          <button class="copy-small-btn" onclick="copyMcpUrl()">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="hero-graphic">
+        <div class="floating-card glass">
+          <div class="card-header-glow green"></div>
+          <div class="card-title"><span class="icon-pulse">🛡️</span> Patient Safety Score</div>
+          <div class="score-display">
+            <span class="score-num">95</span><span class="score-max">/100</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar green" style="width: 95%"></div>
+          </div>
+          <div class="card-footer">Low Risk Regimen • 3 Medications</div>
+        </div>
+        
+        <div class="floating-card glass secondary-card">
+          <div class="card-header-glow red"></div>
+          <div class="card-title">⚠️ Interaction Alert</div>
+          <div class="alert-desc"><strong>Warfarin + Ibuprofen</strong></div>
+          <p class="alert-detail">High risk of major gastrointestinal bleeding due to synergistic antiplatelet effects.</p>
+          <span class="tag tag-danger">Contraindicated</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sandbox / Playground Section -->
+  <section id="playground" class="section playground-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Clinical Sandbox</h2>
+        <p class="section-subtitle">Simulate real clinical regimens and evaluate them against MediGuard's decision logic instantly.</p>
+      </div>
+
+      <div class="sandbox-grid">
+        <!-- Input Form -->
+        <div class="glass panel input-panel">
+          <h3>Patient Profile & Regimen</h3>
+          <form id="analysis-form" onsubmit="runSimulation(event)">
+            <!-- Patient Demographics -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="patient-age">Age</label>
+                <input type="number" id="patient-age" min="1" max="120" value="68" required>
+              </div>
+              <div class="form-group">
+                <label for="patient-egfr">Renal Function (eGFR)</label>
+                <select id="patient-egfr">
+                  <label>Renal Function</label>
+                  <option value="normal">> 60 mL/min (Normal)</option>
+                  <option value="moderate">30 - 59 mL/min (Moderate Impairment)</option>
+                  <option value="severe">&lt; 30 mL/min (Severe Impairment)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Conditions & Allergies -->
+            <div class="form-group">
+              <label>Clinical Conditions</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cond-ckd" value="Chronic Kidney Disease"> Chronic Kidney Disease (CKD)
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cond-t2d" value="Type 2 Diabetes"> Type 2 Diabetes
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cond-afib" value="Atrial Fibrillation"> Atrial Fibrillation
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Drug Allergies</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="allergy-penicillin" value="Penicillin"> Penicillin
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="allergy-sulfa" value="Sulfa"> Sulfa Drugs
+                </label>
+              </div>
+            </div>
+
+            <!-- Medications Input -->
+            <div class="form-group">
+              <label>Current Medications</label>
+              <div class="medication-chips" id="medication-chips-container">
+                <!-- Chips dynamically added here -->
+              </div>
+              
+              <div class="med-input-row">
+                <select id="preset-med-selector">
+                  <label>Preset Medication Selector</label>
+                  <option value="" disabled selected>Quick add a medication...</option>
+                  <option value="warfarin">Warfarin (Anticoagulant)</option>
+                  <option value="ibuprofen">Ibuprofen (NSAID)</option>
+                  <option value="aspirin">Aspirin (Antiplatelet)</option>
+                  <option value="lisinopril">Lisinopril (ACE Inhibitor)</option>
+                  <option value="metformin">Metformin (Antidiabetic)</option>
+                  <option value="diazepam">Diazepam (Benzodiazepine)</option>
+                  <option value="zolpidem">Zolpidem (Sedative)</option>
+                  <option value="amoxicillin">Amoxicillin (Antibiotic)</option>
+                  <option value="acetaminophen">Acetaminophen (Analgesic)</option>
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="addMedicationFromSelector()">Add</button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Analyze Patient Safety</button>
+          </form>
+        </div>
+
+        <!-- Dashboard Outputs -->
+        <div class="glass panel results-panel">
+          <div class="results-placeholder" id="results-placeholder">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <p>Select clinical parameters and click <strong>Analyze Patient Safety</strong> to run the decision engine.</p>
+          </div>
+
+          <div class="results-content hidden" id="results-content">
+            <div class="results-header-summary">
+              <div class="score-circle-container">
+                <svg class="score-ring" width="120" height="120">
+                  <circle class="score-ring-bg" stroke="#1e293b" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                  <circle id="score-ring-fill" class="score-ring-fill" stroke="#10b981" stroke-width="8" fill="transparent" r="50" cx="60" cy="60" stroke-dasharray="314.15" stroke-dashoffset="0"/>
+                </svg>
+                <div class="score-circle-text">
+                  <span id="score-value">100</span>
+                  <span class="score-lbl">Score</span>
+                </div>
+              </div>
+
+              <div class="score-description">
+                <h4 id="risk-badge" class="badge">Low Risk</h4>
+                <p id="risk-summary-text">The regimen is fully safety-validated with no critical contraindications or drug-drug interactions detected.</p>
+              </div>
+            </div>
+
+            <div class="tab-container">
+              <div class="tab-header">
+                <button class="tab-link active" onclick="switchResultTab(event, 'interactions')">Interactions</button>
+                <button class="tab-link" onclick="switchResultTab(event, 'beers')">Geriatric (Beers)</button>
+                <button class="tab-link" onclick="switchResultTab(event, 'contraindications')">Contraindications</button>
+                <button class="tab-link" onclick="switchResultTab(event, 'alternatives')">Alternatives</button>
+              </div>
+
+              <!-- Interactions Tab -->
+              <div id="tab-interactions" class="tab-content active">
+                <div class="alerts-list" id="interactions-list">
+                  <!-- Dynamic content -->
+                </div>
+              </div>
+
+              <!-- Beers Tab -->
+              <div id="tab-beers" class="tab-content">
+                <div class="alerts-list" id="beers-list">
+                  <!-- Dynamic content -->
+                </div>
+              </div>
+
+              <!-- Contraindications Tab -->
+              <div id="tab-contraindications" class="tab-content">
+                <div class="alerts-list" id="contraindications-list">
+                  <!-- Dynamic content -->
+                </div>
+              </div>
+
+              <!-- Alternatives Tab -->
+              <div id="tab-alternatives" class="tab-content">
+                <div class="alerts-list" id="alternatives-list">
+                  <!-- Dynamic content -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Features Section -->
+  <section id="features" class="section dark-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Safety Intelligence Tools</h2>
+        <p class="section-subtitle">MediGuard bundles five specialized clinical logic tools, exposed via standard Model Context Protocol endpoints.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card glass">
+          <div class="feature-icon">🧪</div>
+          <h4>Drug-Drug Interactions</h4>
+          <p>Normalizes drug names using the NIH RxNorm API and cross-references them against OpenFDA drug labels to detect interactions.</p>
+        </div>
+
+        <div class="feature-card glass">
+          <div class="feature-icon">👴</div>
+          <h4>Beers Criteria (Geriatric)</h4>
+          <p>Flags high-risk medication categories (e.g. benzodiazepines, sedatives) in patients aged 65 and older based on AGST guidelines.</p>
+        </div>
+
+        <div class="feature-card glass">
+          <div class="feature-icon">🚫</div>
+          <h4>Contraindications</h4>
+          <p>Verifies active ingredients against patient-specific clinical conditions, lab parameters (e.g. eGFR), and allergies.</p>
+        </div>
+
+        <div class="feature-card glass">
+          <div class="feature-icon">📊</div>
+          <h4>Safety Scoring</h4>
+          <p>Generates a weighted 0-100 safety score, complete with detailed deduction breakdowns and therapeutic duplication flags.</p>
+        </div>
+
+        <div class="feature-card glass">
+          <div class="feature-icon">🔄</div>
+          <h4>What-If Simulation</h4>
+          <p>Simulates adding, removing, or replacing medications in a patient's profile and returns the exact score delta.</p>
+        </div>
+
+        <div class="feature-card glass">
+          <div class="feature-icon">🛡️</div>
+          <h4>SHARP Compliance</h4>
+          <p>Strict HIPAA-ready design. Preserves context propagation without rendering PHI in non-clinical pipelines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Integration & Connection Guide -->
+  <section id="integration" class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Developer Integration</h2>
+        <p class="section-subtitle">Integrate the MediGuard MCP server with your favorite AI agent environments in seconds.</p>
+      </div>
+
+      <div class="integration-tabs-wrapper glass">
+        <div class="integration-tab-headers">
+          <button class="int-tab-link active" onclick="switchIntTab(event, 'claude')">Claude Desktop</button>
+          <button class="int-tab-link" onclick="switchIntTab(event, 'cursor')">Cursor IDE</button>
+          <button class="int-tab-link" onclick="switchIntTab(event, 'envvars')">Required Environment Variables</button>
+        </div>
+
+        <!-- Claude Tab -->
+        <div id="int-claude" class="integration-tab-content active">
+          <p>Add the following block to your <code>claude_desktop_config.json</code> file to expose all safety tools to Claude:</p>
+          <div class="code-block-container">
+            <pre><code>{
+  "mcpServers": {
+    "mediguard": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/inspector",
+        "node",
+        "-e",
+        "const http = require('http'); const req = http.request({host:'mediguard-mcp.onrender.com', path:'/mcp', method:'POST'}); // streamable transport client"
+      ],
+      "env": {
+        "MCP_TRANSPORT": "http"
+      }
+    }
+  }
+}</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy Config</button>
+          </div>
+        </div>
+
+        <!-- Cursor Tab -->
+        <div id="int-cursor" class="integration-tab-content">
+          <p>To connect Cursor to the MediGuard MCP server:</p>
+          <ol class="steps-list">
+            <li>Open Cursor Settings (<code>Ctrl+,</code> or <code>Cmd+,</code>).</li>
+            <li>Navigate to <strong>Features</strong> &gt; <strong>MCP</strong>.</li>
+            <li>Click <strong>+ Add New MCP Server</strong>.</li>
+            <li>Fill in the fields:
+              <ul>
+                <li><strong>Name:</strong> <code>MediGuard</code></li>
+                <li><strong>Type:</strong> <code>SSE</code> (Server-Sent Events)</li>
+                <li><strong>URL:</strong> <code class="highlight-url">https://mediguard-mcp.onrender.com/mcp</code></li>
+              </ul>
+            </li>
+          </ol>
+        </div>
+
+        <!-- Env Variables Tab -->
+        <div id="int-envvars" class="integration-tab-content">
+          <p>Configure these environment variables in your Render dashboard (under the "Environment" tab) for proper functionality:</p>
+          <table class="env-table">
+            <thead>
+              <tr>
+                <th>Variable Name</th>
+                <th>Description</th>
+                <th>Default Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>MCP_TRANSPORT</code></td>
+                <td>MCP transport protocol (stdio or http)</td>
+                <td><code>http</code></td>
+              </tr>
+              <tr>
+                <td><code>PORT</code></td>
+                <td>Port for the web server and MCP streamable transport</td>
+                <td><code>10000</code></td>
+              </tr>
+              <tr>
+                <td><code>GEMINI_API_KEY</code></td>
+                <td>Google Gemini API key for clinical safety explanations</td>
+                <td><em>Optional / LLM Fallback</em></td>
+              </tr>
+              <tr>
+                <td><code>GROQ_API_KEY</code></td>
+                <td>Groq API key for high-speed clinical interaction synthesis</td>
+                <td><em>Optional / LLM Fallback</em></td>
+              </tr>
+              <tr>
+                <td><code>DAILYMED_API_URL</code></td>
+                <td>DailyMed REST API endpoint</td>
+                <td><code>https://dailymed.nlm.nih.gov/dailymed</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-container">
+      <p>&copy; 2026 MediGuard MCP. Built for safety, powered by AI.</p>
+      <p class="footer-note">Clinical decisions should always be validated by qualified healthcare professionals.</p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

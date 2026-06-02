@@ -61,7 +61,25 @@ async function createConnectedServer(
 // HTTP mode: StreamableHTTPServerTransport (for Render / Claude remote)
 // ---------------------------------------------------------------------------
 
+let indexHtml = "";
+let indexCss = "";
+let appJs = "";
+
+function loadStaticAssets(): void {
+  try {
+    const publicDir = path.join(process.cwd(), "src", "public");
+    indexHtml = fs.readFileSync(path.join(publicDir, "index.html"), "utf8");
+    indexCss = fs.readFileSync(path.join(publicDir, "index.css"), "utf8");
+    appJs = fs.readFileSync(path.join(publicDir, "app.js"), "utf8");
+  } catch (err) {
+    logger.error("Failed to read static assets", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 async function startHttpServer(): Promise<void> {
+  loadStaticAssets();
   httpServer = http.createServer(async (req, res) => {
     // CORS headers for browser-based MCP clients
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -94,18 +112,38 @@ async function startHttpServer(): Promise<void> {
       return;
     }
 
-    // Root — server info
+    // Root — serve index.html or JSON info based on Accept header
     if (req.url === "/" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          name: env.MCP_SERVER_NAME,
-          version: env.MCP_SERVER_VERSION,
-          transport: "streamable-http",
-          mcpEndpoint: "/mcp",
-          healthEndpoint: "/health",
-        }),
-      );
+      const accept = req.headers["accept"] || "";
+      if (accept.includes("text/html")) {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(indexHtml);
+      } else {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            name: env.MCP_SERVER_NAME,
+            version: env.MCP_SERVER_VERSION,
+            transport: "streamable-http",
+            mcpEndpoint: "/mcp",
+            healthEndpoint: "/health",
+          }),
+        );
+      }
+      return;
+    }
+
+    // index.css
+    if (req.url === "/index.css" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "text/css" });
+      res.end(indexCss);
+      return;
+    }
+
+    // app.js
+    if (req.url === "/app.js" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/javascript" });
+      res.end(appJs);
       return;
     }
 
