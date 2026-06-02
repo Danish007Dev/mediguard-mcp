@@ -10,10 +10,12 @@ const optionalString = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().min(1).optional());
 
+const isRender = process.env["RENDER"] === "true";
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
-    .default("development"),
+    .default(isRender ? "production" : "development"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   MCP_SERVER_NAME: z.string().min(1).default("mediguard-mcp"),
   MCP_SERVER_VERSION: z.string().min(1).default("0.1.0"),
@@ -63,7 +65,9 @@ const envSchema = z.object({
     .positive()
     .default(86400000),
   DECISION_TRACE_ARCHIVE_PATH: optionalString,
-  MCP_TRANSPORT: z.enum(["stdio", "http"]).default("stdio"),
+  MCP_TRANSPORT: z
+    .enum(["stdio", "http"])
+    .default(isRender ? "http" : "stdio"),
   PORT: z.coerce.number().int().positive().default(3000),
 });
 
