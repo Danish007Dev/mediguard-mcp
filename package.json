@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node src/server.ts",
     "build": "tsc",
+    "postinstall": "npm run build",
     "start": "node dist/server.js",
     "inspect": "npx @modelcontextprotocol/inspector node dist/server.js",
     "inspect:dev": "npm run build && npm run inspect",
